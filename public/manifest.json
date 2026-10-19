@@ -1,0 +1,43 @@
+{
+  "name": "GameDev Toolkit",
+  "short_name": "GameDev Toolkit",
+  "description": "77 browser-local tools for game developers: images, textures, sprites, 3D models, audio, animation, Unity utilities and developer data tools.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b0e14",
+  "theme_color": "#0b0e14",
+  "lang": "en",
+  "categories": ["developer", "utilities", "graphics"],
+  "icons": [
+    {
+      "src": "logo-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Image Resizer",
+      "short_name": "Resize",
+      "url": "./#/t/image-resizer"
+    },
+    {
+      "name": "3D Model Viewer",
+      "short_name": "3D Viewer",
+      "url": "./#/t/model-viewer"
+    },
+    {
+      "name": "JSON Formatter",
+      "short_name": "JSON",
+      "url": "./#/t/json-formatter"
+    }
+  ]
+}

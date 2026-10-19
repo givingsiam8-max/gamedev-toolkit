@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>About — GameDev Toolkit</title>
+    <meta name="description" content="About GameDev Toolkit: a browser-local workspace of 77 game development utilities for 3D, textures, sprites, audio, animation, Unity and developer data work." />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://givingsiam8-max.github.io/gamedev-toolkit/about/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="About — GameDev Toolkit" />
+    <meta property="og:description" content="A browser-local workspace of 77 game development utilities. Files never leave your machine." />
+    <meta property="og:url" content="https://givingsiam8-max.github.io/gamedev-toolkit/about/" />
+    <meta property="og:image" content="https://givingsiam8-max.github.io/gamedev-toolkit/og-image.jpg" />
+    <meta name="theme-color" content="#0b0e14" />
+    <link rel="icon" href="../favicon.ico" sizes="any" />
+    <link rel="icon" type="image/svg+xml" href="../logo-mark.svg" />
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+    <link rel="stylesheet" href="../site.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="site-header-inner">
+        <a class="brand" href="../">
+          <img src="../logo-mark.svg" alt="" width="34" height="34" />
+          <span>GameDev Toolkit</span>
+        </a>
+        <nav class="site-nav" aria-label="Primary">
+          <a href="../">Home</a>
+          <a href="../about/" aria-current="page">About</a>
+          <a href="../contact/">Contact</a>
+          <a href="../privacy/">Privacy</a>
+          <a href="../terms/">Terms</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="container">
+      <span class="badge">About</span>
+      <h1>A toolkit built for daily game development work</h1>
+      <p class="lead">
+        GameDev Toolkit puts 77 focused utilities in one workspace, so you can inspect a model,
+        resize a texture, slice a sprite sheet, check a shader colour and format a JSON file without
+        installing a dozen separate programs or uploading assets to random websites.
+      </p>
+
+      <h2>Why it exists</h2>
+      <p>
+        Small tasks interrupt real work: a texture is 2048×2049, a sprite sheet needs splitting, an
+        FBX has to become a GLB, a GUID needs checking. Those tasks are usually spread across
+        desktop apps, command-line one-offs and ad-supported converters. This project collects them
+        behind one consistent interface with the same behaviour every time.
+      </p>
+
+      <h2>What is inside</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>3D and materials</h3>
+          <p>Model viewer, converter, embedded texture extraction, mesh statistics and a lit PBR material preview.</p>
+        </div>
+        <div class="card">
+          <h3>Images, textures and sprites</h3>
+          <p>Batch resize, convert and compress, channel packing, normal-map preview, seamless tiling, atlases and sprite slicing.</p>
+        </div>
+        <div class="card">
+          <h3>Audio and animation</h3>
+          <p>WAV/MP3 conversion, trimming, gain and fades, waveform analysis, GIF decoding/encoding and frame previews.</p>
+        </div>
+        <div class="card">
+          <h3>Unity and developer tools</h3>
+          <p>GUID and <code>.meta</code> helpers, layer bitmasks, quaternion and vector maths, JSON/XML/YAML, regex, diffs and hashing.</p>
+        </div>
+      </div>
+
+      <h2>Local-first by design</h2>
+      <p>
+        Every tool runs in your browser. Images, models, audio and text are read from your disk into
+        memory and processed there; there is no upload endpoint, no account and no server-side
+        storage. Preferences such as favourites and recent tools live in your browser's
+        <code>localStorage</code> and can be cleared from the Settings dialog.
+      </p>
+
+      <h2>How it is built</h2>
+      <p>
+        The interface is React and TypeScript on Vite. Each tool is an independent module that
+        declares its own metadata and lazily loads its implementation, so heavy libraries — three.js,
+        the MP3 encoder, YAML and GIF codecs — are only downloaded when you open the tool that needs
+        them. The source code is public on
+        <a href="https://github.com/givingsiam8-max/gamedev-toolkit" rel="noopener">GitHub</a>.
+      </p>
+
+      <h2>Who it is for</h2>
+      <p>
+        Unity and Unreal developers, 2D and 3D artists, technical artists, designers and anyone who
+        works with game assets regularly. The tools aim to be understandable without a manual:
+        clear labels, visible results and honest messages when a browser cannot do something.
+      </p>
+
+      <div class="actions">
+        <a class="btn" href="../">Open the toolkit</a>
+        <a class="btn btn-secondary" href="../contact/">Contact and support</a>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span>© 2026 GameDev Toolkit. Files are processed locally in your browser.</span>
+        <nav aria-label="Footer">
+          <a href="../about/">About</a>
+          <a href="../contact/">Contact</a>
+          <a href="../privacy/">Privacy</a>
+          <a href="../terms/">Terms</a>
+          <a href="https://github.com/givingsiam8-max/gamedev-toolkit" rel="noopener">GitHub</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

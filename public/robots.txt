@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://givingsiam8-max.github.io/gamedev-toolkit/sitemap.xml

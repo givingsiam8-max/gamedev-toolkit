@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Page not found — GameDev Toolkit</title>
+    <meta name="robots" content="noindex, follow" />
+    <meta name="theme-color" content="#0b0e14" />
+    <link rel="icon" href="/gamedev-toolkit/favicon.ico" sizes="any" />
+    <style>
+      :root { --bg:#0b0e14; --panel:#10141c; --border:#232a37; --text:#eef2f8; --muted:#a9b4c4; --dim:#78849a; --accent:#3b82f6; }
+      * { box-sizing: border-box; }
+      body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+        background: radial-gradient(120% 150% at 15% -10%, rgba(59,130,246,.18), transparent 55%),
+                    radial-gradient(100% 140% at 90% 0%, rgba(139,92,246,.14), transparent 55%), var(--bg);
+        color:var(--text); font-family:"Segoe UI", Inter, Arial, sans-serif; line-height:1.65; }
+      .wrap { width:100%; max-width:640px; background:var(--panel); border:1px solid var(--border);
+        border-radius:18px; padding:clamp(26px,5vw,42px); box-shadow:0 18px 46px rgba(0,0,0,.45); }
+      .brand { display:flex; align-items:center; gap:10px; font-weight:700; margin-bottom:26px; }
+      .brand svg { width:34px; height:34px; display:block; }
+      .code { font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:700; }
+      h1 { font-size:clamp(28px,5vw,38px); line-height:1.15; letter-spacing:-.025em; margin:6px 0 12px; }
+      p { color:var(--muted); margin:0 0 14px; }
+      .actions { display:flex; gap:10px; flex-wrap:wrap; margin:24px 0 8px; }
+      a.btn { display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:0 18px;
+        border-radius:8px; background:var(--accent); border:1px solid var(--accent); color:#fff;
+        text-decoration:none; font-weight:600; font-size:15px; }
+      a.btn:hover { background:#2f74e8; border-color:#2f74e8; }
+      a.btn.secondary { background:transparent; border-color:#303a4b; color:var(--text); }
+      a.btn.secondary:hover { background:#161b25; }
+      .links { display:flex; gap:16px; flex-wrap:wrap; margin-top:22px; font-size:14px; }
+      .links a { color:var(--muted); text-decoration:none; }
+      .links a:hover { color:var(--text); text-decoration:underline; }
+      code { font-family:ui-monospace, Consolas, monospace; background:#161b25; border:1px solid var(--border);
+        border-radius:5px; padding:1px 5px; color:var(--text); font-size:.9em; }
+      ul { color:var(--muted); padding-left:20px; margin:10px 0 16px; }
+      li { margin-bottom:6px; }
+      .skip { position:absolute; left:12px; top:-60px; background:var(--accent); color:#fff; padding:10px 14px; border-radius:8px; text-decoration:none; }
+      .skip:focus { top:12px; }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <main id="main" class="wrap">
+      <div class="brand">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <defs>
+            <linearGradient id="g" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#3B82F6" /><stop offset="1" stop-color="#8B5CF6" />
+            </linearGradient>
+          </defs>
+          <rect width="64" height="64" rx="15" fill="url(#g)" />
+          <path d="M32 13.5 48.5 23v18L32 50.5 15.5 41V23L32 13.5Z" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round" />
+          <path d="M32 13.5v18M32 31.5 48.5 23M32 31.5 15.5 23" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" />
+          <circle cx="32" cy="31.5" r="3.4" fill="#fff" />
+        </svg>
+        <span>GameDev Toolkit</span>
+      </div>
+
+      <div class="code">404 — Page not found</div>
+      <h1>That page does not exist</h1>
+      <p>
+        The address may be mistyped, or the page may have moved. Tool pages are reached from the
+        dashboard and use routes like <code>/#/t/image-resizer</code>.
+      </p>
+      <ul>
+        <li>The homepage lists every category and tool.</li>
+        <li>Use the search box (or press <code>Ctrl</code> + <code>K</code>) to find a tool.</li>
+        <li>If a link on this site brought you here, please report it.</li>
+      </ul>
+
+      <div class="actions">
+        <a class="btn" href="/gamedev-toolkit/">Open the toolkit</a>
+        <a class="btn secondary" href="/gamedev-toolkit/contact/">Report a broken link</a>
+      </div>
+
+      <nav class="links" aria-label="Helpful links">
+        <a href="/gamedev-toolkit/about/">About</a>
+        <a href="/gamedev-toolkit/contact/">Contact</a>
+        <a href="/gamedev-toolkit/privacy/">Privacy</a>
+        <a href="/gamedev-toolkit/terms/">Terms</a>
+        <a href="https://github.com/givingsiam8-max/gamedev-toolkit" rel="noopener">GitHub</a>
+      </nav>
+    </main>
+  </body>
+</html>

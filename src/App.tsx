@@ -56,6 +56,16 @@ function Shell() {
 
   return (
     <div className={`app ${settings.sidebarCollapsed ? 'app-sidebar-collapsed' : ''}`}>
+      <a
+        className="skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById('main-content')?.focus();
+        }}
+      >
+        Skip to content
+      </a>
       <Sidebar
         route={route}
         onSelectHome={() => go({ name: 'home' })}
@@ -85,7 +95,7 @@ function Shell() {
           />
         )}
 
-        <main className="content" ref={contentRef}>
+        <main className="content" id="main-content" tabIndex={-1} ref={contentRef}>
           <ErrorBoundary scope="This view">
             {route.name === 'home' && (
               <Dashboard
@@ -129,6 +139,32 @@ function Shell() {
               <SearchView query={route.query} onOpenTool={openTool} />
             )}
           </ErrorBoundary>
+
+          <footer className="site-footer">
+            <div className="site-footer-inner">
+              <div className="site-footer-brand">
+                <img src="./logo-mark.svg" alt="" width={26} height={26} />
+                <div>
+                  <div className="strong">GameDev Toolkit</div>
+                  <div className="dim tiny">Files are processed locally in your browser.</div>
+                </div>
+              </div>
+              <nav className="site-footer-links" aria-label="Site">
+                <a href="./about/">About</a>
+                <a href="./contact/">Contact</a>
+                <a href="./privacy/">Privacy</a>
+                <a href="./terms/">Terms</a>
+                <a
+                  href="https://github.com/givingsiam8-max/gamedev-toolkit"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  GitHub
+                </a>
+              </nav>
+              <div className="site-footer-copy dim tiny">© {new Date().getFullYear()} GameDev Toolkit</div>
+            </div>
+          </footer>
         </main>
       </div>
 

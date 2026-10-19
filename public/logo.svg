@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 128" width="520" height="128" role="img" aria-label="GameDev Toolkit">
+  <defs>
+    <linearGradient id="gdt-word" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3B82F6" />
+      <stop offset="1" stop-color="#8B5CF6" />
+    </linearGradient>
+    <g id="gdt-mark-shape">
+      <rect width="64" height="64" rx="15" fill="url(#gdt-word)" />
+      <path d="M32 13.5 48.5 23v18L32 50.5 15.5 41V23L32 13.5Z" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linejoin="round" />
+      <path d="M32 13.5v18M32 31.5 48.5 23M32 31.5 15.5 23" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" />
+      <circle cx="32" cy="31.5" r="3.4" fill="#FFFFFF" />
+    </g>
+  </defs>
+  <use href="#gdt-mark-shape" transform="translate(8 24) scale(1.25)" />
+  <text x="108" y="68" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="36" font-weight="700" fill="#EEF2F8">GameDev</text>
+  <text x="108" y="102" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="23" font-weight="500" letter-spacing="0.06em" fill="#A9B4C4">TOOLKIT</text>
+</svg>

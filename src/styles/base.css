@@ -121,6 +121,29 @@ svg {
   outline: none;
 }
 
+/* Skip link — visible only when focused, targets the main scroll area. */
+.skip-link {
+  position: fixed;
+  left: 14px;
+  top: -80px;
+  z-index: 300;
+  background: var(--accent);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: var(--r-sm);
+  font-weight: 620;
+  transition: top var(--t-fast);
+}
+.skip-link:focus {
+  top: 14px;
+  text-decoration: none;
+  color: #fff;
+}
+
+.content:focus {
+  outline: none;
+}
+
 /* ==========================================================================
    Utilities
    ========================================================================== */

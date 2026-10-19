@@ -60,6 +60,44 @@ and one registration entry — navigation, search, recents and favourites update
 
 `docs/TOOL_SPEC.md` documents the frozen API contract and UI conventions.
 
+## Website pages and SEO
+
+The public site is **https://givingsiam8-max.github.io/gamedev-toolkit/** and is deployed by
+`.github/workflows/deploy.yml` on every push to `main`.
+
+| URL | Purpose |
+| --- | --- |
+| `/` | The toolkit (single-page app) |
+| `/about/` | What the project is and how it is built |
+| `/contact/` | Support through GitHub Issues (no form or email) |
+| `/privacy/` | Local-only data handling, hosting logs, no analytics |
+| `/terms/` | Terms of use, no-warranty and liability notes |
+| `/404.html` | Custom missing-page screen (served by GitHub Pages with a 404 status) |
+| `/sitemap.xml` | Crawlable page list |
+| `/robots.txt` | Crawler rules plus the sitemap URL |
+| `/manifest.json` | Web app metadata, icons and tool shortcuts |
+
+Brand assets in `public/`: `logo-mark.svg`, `logo.svg`, `favicon.ico` (multi-size),
+`apple-touch-icon.png`, `logo-192.png`, `logo-512.png` and `og-image.jpg`. To regenerate the raster
+assets after changing the mark:
+
+```bash
+npm i -D puppeteer-core
+CHROME_PATH="C:/Program Files/Google/Chrome/Application/chrome.exe" node scripts/generate-brand-assets.mjs
+```
+
+SEO configuration lives in `index.html` (title, description, canonical, robots, Open Graph,
+Twitter card, JSON-LD) and in each static page's head.
+
+**Google Search Console:** add the property, copy the verification `<meta>` tag from the provider
+and paste it into the marked comment block in `index.html`. Then submit `sitemap.xml`.
+
+**Analytics:** none are enabled, and the Privacy Policy says so. If you add a provider (for
+example GA4), update `/privacy/` first, then load the script after the app has rendered.
+
+**HTTPS:** GitHub Pages issues and enforces the certificate; `https_enforced` is enabled on the
+repository's Pages configuration.
+
 ## Honest limitations
 
 - Codec support depends on the browser. Canvas can encode PNG/JPG everywhere and WebP in current

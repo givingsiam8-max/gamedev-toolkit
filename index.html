@@ -4,15 +4,76 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark light" />
+    <title>GameDev Toolkit — 77 browser-local game development tools</title>
     <meta
       name="description"
-      content="GameDev Toolkit - one workspace for game development assets, images, textures, 3D models, colors, materials and developer utilities."
+      content="A professional, local-first workspace for game developers: 3D models, textures, sprites, images, audio, animation, Unity utilities and developer data tools. Files are processed in your browser and never uploaded."
     />
-    <title>GameDev Toolkit</title>
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233b82f6'/%3E%3C/svg%3E"
+    <meta
+      name="keywords"
+      content="game development tools, unity tools, 3d model converter, fbx, glb, texture tools, sprite sheet generator, image converter, json formatter, browser tools"
     />
+    <meta name="author" content="GameDev Toolkit" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <link rel="canonical" href="https://givingsiam8-max.github.io/gamedev-toolkit/" />
+    <meta name="theme-color" content="#0b0e14" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="GameDev Toolkit" />
+    <meta property="og:title" content="GameDev Toolkit — 77 browser-local game development tools" />
+    <meta
+      property="og:description"
+      content="One workspace for game development assets, images, textures, 3D models, audio, animation and developer utilities. Everything runs locally in your browser."
+    />
+    <meta property="og:url" content="https://givingsiam8-max.github.io/gamedev-toolkit/" />
+    <meta property="og:image" content="https://givingsiam8-max.github.io/gamedev-toolkit/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="GameDev Toolkit — one workspace for game development tools" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="GameDev Toolkit — 77 browser-local game development tools" />
+    <meta
+      name="twitter:description"
+      content="3D, textures, sprites, images, audio, animation, Unity helpers and developer tools. Files never leave your machine."
+    />
+    <meta name="twitter:image" content="https://givingsiam8-max.github.io/gamedev-toolkit/og-image.jpg" />
+
+    <link rel="icon" href="./favicon.ico" sizes="any" />
+    <link rel="icon" type="image/svg+xml" href="./logo-mark.svg" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.json" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "GameDev Toolkit",
+        "url": "https://givingsiam8-max.github.io/gamedev-toolkit/",
+        "description": "A local-first workspace of 77 browser-based tools for game development: 3D models, textures, sprites, images, audio, animation, Unity utilities and developer data tools.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript and a modern browser such as Chrome, Edge, Firefox or Safari.",
+        "isAccessibleForFree": true,
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    </script>
+
+    <!--
+      Google Search Console verification:
+      paste the meta tag from your Search Console property here and remove this comment.
+      <meta name="google-site-verification" content="YOUR_VERIFICATION_TOKEN" />
+
+      Analytics: no analytics or tracking scripts are enabled.
+      If you add a provider such as GA4, update /privacy/ first and load the script only after render.
+    -->
+
     <script>
       // Apply the saved theme before first paint to avoid a flash of the wrong theme.
       try {
@@ -25,6 +86,32 @@
     </script>
   </head>
   <body>
+    <noscript>
+      <div
+        style="
+          max-width: 640px;
+          margin: 12vh auto;
+          padding: 24px;
+          background: #10141c;
+          border: 1px solid #232a37;
+          border-radius: 14px;
+          color: #eef2f8;
+          font-family: system-ui, sans-serif;
+          line-height: 1.6;
+        "
+      >
+        <h1 style="font-size: 22px; margin: 0 0 8px">JavaScript is required</h1>
+        <p style="color: #a9b4c4; margin: 0 0 14px">
+          GameDev Toolkit runs entirely in your browser, so its tools need JavaScript. Enable it and
+          reload the page.
+        </p>
+        <p style="color: #a9b4c4; margin: 0">
+          <a href="./about/" style="color: #3b82f6">About</a> ·
+          <a href="./contact/" style="color: #3b82f6">Contact</a> ·
+          <a href="./privacy/" style="color: #3b82f6">Privacy</a>
+        </p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

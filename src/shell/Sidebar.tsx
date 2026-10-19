@@ -1,4 +1,4 @@
-import { Heart, History, Home, PanelLeftClose, PanelLeftOpen, Settings, Wrench } from 'lucide-react';
+import { Heart, History, Home, PanelLeftClose, PanelLeftOpen, Settings } from 'lucide-react';
 import { getCategories, getTool, getToolsByCategory } from '../core/registry';
 import { useAppState } from '../core/store';
 import type { Route } from '../core/router';
@@ -30,7 +30,7 @@ export function Sidebar({
     <nav className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''} ${mobileOpen ? 'sidebar-open' : ''}`}>
       <div className="brand" onClick={onSelectHome} title="GameDev Toolkit — home">
         <span className="brand-mark">
-          <Wrench />
+          <img src="./logo-mark.svg" alt="" width={20} height={20} />
         </span>
         <span className="brand-text">
           <span className="brand-name">GameDev Toolkit</span>

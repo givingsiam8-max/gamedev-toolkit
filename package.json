@@ -1,0 +1,33 @@
+{
+  "name": "gamedev-toolkit",
+  "private": true,
+  "version": "0.1.0",
+  "description": "GameDev Toolkit - one workspace for game development assets, images, textures, 3D models, colors, materials and developer utilities.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --port 4173",
+    "typecheck": "tsc -b --force"
+  },
+  "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
+    "fflate": "^0.8.3",
+    "gifenc": "^1.0.3",
+    "gifuct-js": "^2.1.2",
+    "js-yaml": "^5.4.2",
+    "lucide-react": "^1.52.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2"
+  }
+}

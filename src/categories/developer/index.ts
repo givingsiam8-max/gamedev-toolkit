@@ -1,0 +1,176 @@
+import {
+  Braces,
+  CaseSensitive,
+  Code,
+  FileCode,
+  FileJson,
+  Fingerprint,
+  Hash,
+  Link,
+  Binary,
+  Minimize,
+  ArrowLeftRight,
+  Search,
+  ShieldCheck,
+} from 'lucide-react';
+import type { CategoryModule, ToolDefinition } from '../../core/types';
+
+const tools: ToolDefinition[] = [
+  {
+    id: 'json-formatter',
+    name: 'JSON Formatter',
+    category: 'developer',
+    subcategory: 'json',
+    description: 'Pretty-print, minify, sort keys and escape JSON, with size before and after.',
+    keywords: ['json', 'format', 'beautify', 'pretty print', 'minify', 'sort keys', 'indent', 'escape', 'json lines'],
+    formats: ['JSON'],
+    icon: FileJson,
+    load: () => import('./tools/json-formatter'),
+  },
+  {
+    id: 'json-validator',
+    name: 'JSON Validator',
+    category: 'developer',
+    subcategory: 'json',
+    description: 'Check JSON syntax with exact line and column of the first error, plus one-click common fixes.',
+    keywords: ['json', 'validate', 'lint', 'syntax error', 'position', 'line', 'column', 'repair'],
+    formats: ['JSON'],
+    icon: ShieldCheck,
+    load: () => import('./tools/json-validator'),
+  },
+  {
+    id: 'xml-formatter',
+    name: 'XML Formatter',
+    category: 'developer',
+    subcategory: 'text',
+    description: 'Indent or minify XML after checking it is well-formed.',
+    keywords: ['xml', 'format', 'beautify', 'minify', 'indent', 'tags', 'attributes'],
+    formats: ['XML'],
+    icon: Code,
+    load: () => import('./tools/xml-formatter'),
+  },
+  {
+    id: 'yaml-viewer',
+    name: 'YAML Viewer',
+    category: 'developer',
+    subcategory: 'text',
+    description: 'Convert YAML to JSON or JSON to YAML, with an expandable tree and parse errors that show their line.',
+    keywords: ['yaml', 'yml', 'viewer', 'tree', 'convert to json', 'validate'],
+    formats: ['YAML', 'YML'],
+    icon: FileCode,
+    load: () => import('./tools/yaml-viewer'),
+  },
+  {
+    id: 'regex-tester',
+    name: 'Regex Tester',
+    category: 'developer',
+    subcategory: 'text',
+    description: 'Test regular expressions with live highlighting, group tables and a replace preview.',
+    keywords: ['regex', 'regexp', 'test', 'match', 'groups', 'named groups', 'replace', 'pattern', 'flags'],
+    icon: Search,
+    load: () => import('./tools/regex-tester'),
+  },
+  {
+    id: 'text-diff',
+    name: 'Text Diff',
+    category: 'developer',
+    subcategory: 'text',
+    description: 'Compare two texts line by line with word-level highlights, side-by-side or unified.',
+    keywords: ['diff', 'compare', 'changes', 'lines', 'added', 'removed', 'side by side'],
+    formats: ['TXT'],
+    icon: ArrowLeftRight,
+    load: () => import('./tools/text-diff'),
+  },
+  {
+    id: 'text-minifier',
+    name: 'Text Minifier',
+    category: 'developer',
+    subcategory: 'text',
+    description: 'Conservatively strip comments and whitespace from CSS, JS, JSON and XML. Never renames identifiers.',
+    keywords: ['minify', 'whitespace', 'comments', 'css', 'javascript', 'json', 'shrink', 'compress'],
+    formats: ['CSS', 'JS', 'JSON', 'XML'],
+    icon: Minimize,
+    load: () => import('./tools/text-minifier'),
+  },
+  {
+    id: 'text-case-converter',
+    name: 'Text Case Converter',
+    category: 'developer',
+    subcategory: 'text',
+    description: 'Convert text or identifiers between camelCase, snake_case, kebab-case, PascalCase and more.',
+    keywords: ['case', 'camel case', 'snake case', 'pascal case', 'kebab', 'constant case', 'upper', 'lower', 'title'],
+    formats: ['TXT'],
+    icon: CaseSensitive,
+    load: () => import('./tools/text-case-converter'),
+  },
+  {
+    id: 'base64-encoder',
+    name: 'Base64 Encoder',
+    category: 'developer',
+    subcategory: 'encoding',
+    description: 'Encode and decode UTF-8 text to and from Base64, with optional data URI output.',
+    keywords: ['base64', 'encode', 'decode', 'data uri', 'text', 'utf-8'],
+    formats: ['TXT'],
+    icon: Binary,
+    load: () => import('./tools/base64-encoder'),
+  },
+  {
+    id: 'url-encoder',
+    name: 'URL Encoder',
+    category: 'developer',
+    subcategory: 'encoding',
+    description: 'Percent-encode and decode URLs, components and query strings.',
+    keywords: ['url', 'uri', 'percent encoding', 'encode', 'decode', 'query string', 'component'],
+    formats: ['TXT'],
+    icon: Link,
+    load: () => import('./tools/url-encoder'),
+  },
+  {
+    id: 'uuid-generator',
+    name: 'UUID Generator',
+    category: 'developer',
+    subcategory: 'generate',
+    description: 'Generate random UUID v4 values in bulk, with format options. IDs are randomly generated, not registry-guaranteed.',
+    keywords: ['uuid', 'guid', 'v4', 'unique id', 'bulk', 'nil', 'namespace'],
+    icon: Fingerprint,
+    load: () => import('./tools/uuid-generator'),
+  },
+  {
+    id: 'hash-generator',
+    name: 'Hash Generator',
+    category: 'developer',
+    subcategory: 'generate',
+    description: 'Hash text or files with SHA-1, SHA-256, SHA-384, SHA-512 and CRC32.',
+    keywords: ['hash', 'sha256', 'sha1', 'sha384', 'sha512', 'crc32', 'checksum', 'file hash', 'verify', 'text hash'],
+    icon: Hash,
+    load: () => import('./tools/hash-generator'),
+  },
+];
+
+/**
+ * Developer Tools
+ * Data and text utilities developers reach for daily: JSON, XML, YAML, regex testing, diffs, hashing, encoding and ID generation.
+ *
+ * Tools are independent modules: add an entry to `tools` below and create the
+ * matching component in ./tools/<id>.tsx with a default export. The lazy
+ * `load` keeps heavy libraries out of the initial bundle.
+ */
+export const category: CategoryModule = {
+  category: {
+    id: 'developer',
+    name: 'Developer Tools',
+    description:
+      'Data and text utilities developers reach for daily: JSON, XML, YAML, regex testing, diffs, hashing, encoding and ID generation.',
+    icon: Braces,
+    accent: 'blue',
+    subcategories: [
+    { id: 'json', name: 'JSON' },
+    { id: 'text', name: 'Text' },
+    { id: 'encoding', name: 'Encoding' },
+    { id: 'generate', name: 'Generators' },
+    ],
+  },
+  tools,
+};
+
+export default category;

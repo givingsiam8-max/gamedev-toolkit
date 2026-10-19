@@ -1,0 +1,170 @@
+/* ==========================================================================
+   GameDev Toolkit — design tokens
+   Dark/night theme (default), Midnight (deeper), Light.
+   ========================================================================== */
+
+:root {
+  /* Radius */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-full: 999px;
+
+  /* Spacing scale */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+
+  /* Type */
+  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", "Cascadia Mono",
+    Consolas, "Liberation Mono", monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12.5px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 26px;
+  --fs-3xl: 34px;
+
+  /* Motion — subtle and functional only */
+  --t-fast: 110ms ease;
+  --t-base: 160ms ease;
+  --t-slow: 240ms ease;
+
+  /* Layout */
+  --sidebar-w: 236px;
+  --sidebar-w-collapsed: 78px;
+  --topbar-h: 62px;
+
+  /* Accents — shared across themes */
+  --accent: #3b82f6;
+  --accent-hover: #2f74e8;
+  --accent-active: #2563d4;
+  --accent-soft: rgba(59, 130, 246, 0.14);
+  --accent-ring: rgba(59, 130, 246, 0.42);
+  --accent-ink: #ffffff;
+
+  --success: #23b26d;
+  --success-soft: rgba(35, 178, 109, 0.14);
+  --warning: #e0a020;
+  --warning-soft: rgba(224, 160, 32, 0.15);
+  --danger: #e5484d;
+  --danger-soft: rgba(229, 72, 77, 0.14);
+  --info: #38bdf8;
+  --info-soft: rgba(56, 189, 248, 0.14);
+
+  --violet: #8b5cf6;
+  --cyan: #06b6d4;
+  --emerald: #10b981;
+  --amber: #f59e0b;
+  --rose: #f43f5e;
+  --orange: #f97316;
+  --teal: #14b8a6;
+  --indigo: #6366f1;
+  --lime: #84cc16;
+  --pink: #ec4899;
+  --sky: #0ea5e9;
+}
+
+/* --------------------------------------------------------------------------
+   Dark (default)
+   -------------------------------------------------------------------------- */
+:root,
+[data-theme="dark"] {
+  --bg-0: #0b0e14;
+  --bg-1: #10141c;
+  --bg-2: #161b25;
+  --bg-3: #1c222e;
+  --bg-4: #232a38;
+  --bg-inset: #0a0d13;
+  --bg-overlay: rgba(6, 8, 12, 0.72);
+
+  --border: #232a37;
+  --border-strong: #303a4b;
+  --border-soft: #1b212b;
+
+  --text-0: #eef2f8;
+  --text-1: #a9b4c4;
+  --text-2: #78849a;
+  --text-3: #5b6577;
+  --text-on-accent: #ffffff;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.38);
+  --shadow-lg: 0 18px 46px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 0 1px rgba(59, 130, 246, 0.35), 0 8px 26px rgba(59, 130, 246, 0.18);
+
+  --checker-a: #171c25;
+  --checker-b: #1f2531;
+  --stage: #0d1117;
+}
+
+/* --------------------------------------------------------------------------
+   Midnight — deeper, higher contrast
+   -------------------------------------------------------------------------- */
+[data-theme="midnight"] {
+  --bg-0: #05070b;
+  --bg-1: #090d14;
+  --bg-2: #0e131c;
+  --bg-3: #141a25;
+  --bg-4: #1a2230;
+  --bg-inset: #04060a;
+  --bg-overlay: rgba(2, 4, 7, 0.78);
+
+  --border: #1a2130;
+  --border-strong: #26303f;
+  --border-soft: #12171f;
+
+  --text-0: #f4f7fd;
+  --text-1: #9fabc0;
+  --text-2: #6c7789;
+  --text-3: #4d5769;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 8px 22px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 22px 54px rgba(0, 0, 0, 0.65);
+
+  --checker-a: #0d1117;
+  --checker-b: #141b24;
+  --stage: #06090e;
+}
+
+/* --------------------------------------------------------------------------
+   Light — for bright rooms and printing screenshots
+   -------------------------------------------------------------------------- */
+[data-theme="light"] {
+  --bg-0: #f3f5f9;
+  --bg-1: #ffffff;
+  --bg-2: #ffffff;
+  --bg-3: #f1f4f9;
+  --bg-4: #e7ecf3;
+  --bg-inset: #f7f9fc;
+  --bg-overlay: rgba(18, 24, 34, 0.42);
+
+  --border: #dde3ec;
+  --border-strong: #c5cedb;
+  --border-soft: #e8edf4;
+
+  --text-0: #121722;
+  --text-1: #4a5568;
+  --text-2: #6b7688;
+  --text-3: #8b95a6;
+
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.08);
+  --shadow-md: 0 6px 18px rgba(16, 24, 40, 0.1);
+  --shadow-lg: 0 18px 44px rgba(16, 24, 40, 0.16);
+
+  --accent-soft: rgba(59, 130, 246, 0.12);
+
+  --checker-a: #eef1f6;
+  --checker-b: #ffffff;
+  --stage: #e9edf3;
+}

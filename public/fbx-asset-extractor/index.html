@@ -106,7 +106,10 @@
         <li>Only the mesh objects and texture media stored in the file can be extracted.</li>
         <li>External texture paths cannot be read in the browser; they are listed for reference.</li>
         <li>ASCII FBX files usually reference textures externally rather than embedding them.</li>
-        <li>FBX is import-only. There is no client-side FBX encoder; export meshes as OBJ, GLB, STL or PLY.</li>
+        <li>
+          Meshes can be exported as OBJ, GLB, STL, PLY or ASCII FBX. FBX output is static geometry
+          with basic materials — no skinning or animation.
+        </li>
         <li>Very large models may take a few seconds to parse; the interface shows progress and stays on the tool.</li>
       </ul>
 

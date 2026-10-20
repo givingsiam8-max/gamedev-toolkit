@@ -102,7 +102,8 @@ repository's Pages configuration.
 
 - Codec support depends on the browser. Canvas can encode PNG/JPG everywhere and WebP in current
   Chromium/Firefox; audio decoding depends on the platform's codecs.
-- 3D: FBX and Collada are import-only — there is no client-side FBX/DAE encoder. DRACO/KTX2
+- 3D: FBX can be exported as ASCII 7.4 for static meshes with basic Phong materials — skinning,
+  morph targets, animations and textures are not embedded. Collada is import-only. DRACO/KTX2
   compressed glTF is not supported.
 - Background removal is colour keying, not AI segmentation; it needs a flat background.
 - Texture "VRAM" and draw-call numbers are estimates from geometry, not profiler measurements.

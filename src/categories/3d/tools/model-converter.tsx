@@ -27,13 +27,15 @@ import {
   type LoadedModel,
   type ModelStats,
 } from '../model';
+import { exportAsciiFbx } from '../fbx-export';
 
-type Target = 'glb' | 'gltf' | 'obj' | 'stl' | 'ply';
+type Target = 'glb' | 'gltf' | 'obj' | 'stl' | 'ply' | 'fbx';
 
 const TARGETS: Array<{ value: Target; label: string }> = [
   { value: 'glb', label: 'GLB (binary glTF)' },
   { value: 'gltf', label: 'glTF (JSON)' },
   { value: 'obj', label: 'OBJ' },
+  { value: 'fbx', label: 'FBX (ASCII 7.4, static meshes)' },
   { value: 'stl', label: 'STL' },
   { value: 'ply', label: 'PLY' },
 ];
@@ -65,7 +67,7 @@ export default function ModelConverter() {
   };
 
   const run = () =>
-    convertTask.run(async () => {
+    convertTask.run(async (report) => {
       const model = modelRef.current;
       if (!model || !file) throw new UserError('Load a model first.');
       const base = stripExt(file.name);
@@ -87,6 +89,18 @@ export default function ModelConverter() {
       if (target === 'obj') {
         const text = new OBJExporter().parse(model.root);
         return { blob: new Blob([text], { type: 'text/plain' }), name: `${base}.obj` };
+      }
+
+      if (target === 'fbx') {
+        const text = await exportAsciiFbx(model.root, {
+          onProgress: (done, total, name) => {
+            report(total > 0 ? done / total : 1, `Writing FBX mesh ${done}/${total}: ${name}`);
+          },
+        });
+        return {
+          blob: new Blob([text], { type: 'model/fbx' }),
+          name: `${base}.fbx`,
+        };
       }
 
       if (target === 'stl') {
@@ -144,14 +158,15 @@ export default function ModelConverter() {
               hint={target === 'stl' ? 'Binary STL is much smaller than ASCII.' : 'Binary PLY keeps precision compactly.'}
             />
           )}
-          <Notice tone="warning" title="Read-only formats">
-            FBX and DAE can be imported, but there is no client-side FBX or Collada encoder. GLB is
-            the recommended interchange format when you need materials and animations preserved.
-            STL and PLY drop UVs, materials and animations by design.
+          <Notice tone="warning" title="FBX export is static">
+            FBX output is ASCII 7.4 with meshes (baked world transforms) and basic Phong materials.
+            Skinning, morph targets, animations and embedded textures are not written, and DAE export
+            is not available. GLB is the better choice when you need materials and animations
+            preserved. STL and PLY drop UVs and materials by design.
           </Notice>
           <Notice tone="info">
             glTF export embeds textures when the exporter can read them; unsupported texture encodings
-            may be skipped.
+            may be skipped. FBX export never embeds textures.
           </Notice>
         </>
       }

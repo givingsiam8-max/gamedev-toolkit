@@ -376,6 +376,12 @@ subcategories: `convert`, `layout`, `text`
   preview at the playhead and exports both halves; it does not alter the working
   clip. Always leave the user's original file untouched and keep everything
   local.
+- Multi-layer mode (`LayerTimeline.tsx` + `timeline.ts`) keeps a list of layers,
+  each holding clips with their own source offset, timeline start and duration.
+  Clips can be dragged, moved between layers and edge-trimmed. `splitClip` cuts
+  a clip at the playhead, and `mixLayers` sums audible layers (solo overrides
+  mute) before the same master render pass. Store layer undo snapshots separately
+  from single-clip snapshots.
 - GIF decoding: use `gifuct-js` (`parseGIF`, `decompressFrames(buffer, true)`).
   Compose each frame onto an accumulating canvas honouring `disposalType`
   (0/1 = leave, 2 = clear to background, 3 = restore previous). GIF encoding uses

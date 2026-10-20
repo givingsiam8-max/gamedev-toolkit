@@ -1,7 +1,7 @@
 {
   "name": "GameDev Toolkit",
   "short_name": "GameDev Toolkit",
-  "description": "77 browser-local tools for game developers: images, textures, sprites, 3D models, audio, animation, Unity utilities and developer data tools.",
+  "description": "76 browser-local tools for game developers: images, textures, sprites, 3D models, audio, animation, Unity utilities and developer data tools.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -2,14 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
   Download,
+  Layers,
   Music,
   Pause,
   Play,
+  Plus,
   Redo2,
   RefreshCw,
   Scissors,
   Slice,
+  Trash2,
   Undo2,
+  Volume2,
 } from 'lucide-react';
 import { ToolShell } from '../../components/ToolShell';
 import {
@@ -21,6 +25,7 @@ import {
   NumberInput,
   Panel,
   SectionTitle,
+  Segmented,
   Select,
   Spinner,
   Stat,
@@ -43,9 +48,22 @@ import {
   volumeToDb,
   type EditorSettings,
 } from './editor';
+import { LayerTimeline } from './LayerTimeline';
+import {
+  cloneLayers,
+  findClip,
+  mixLayers,
+  newAudioId,
+  nextFreeStart,
+  splitClip,
+  timelineEnd,
+  type AudioClip,
+  type AudioLayer,
+} from './timeline';
 
 type Variant = 'easy' | 'advanced';
 type OutputFormat = 'wav' | 'mp3';
+type EditorMode = 'clip' | 'layers';
 
 interface Snapshot {
   buffer: AudioBuffer;
@@ -55,6 +73,16 @@ interface Snapshot {
 interface History {
   past: Snapshot[];
   future: Snapshot[];
+}
+
+interface LayerSnapshot {
+  layers: AudioLayer[];
+  settings: EditorSettings | null;
+}
+
+interface LayerHistory {
+  past: LayerSnapshot[];
+  future: LayerSnapshot[];
 }
 
 interface OutputFile {
@@ -157,29 +185,72 @@ export function AudioEditor({ variant }: { variant: Variant }) {
   const [exporting, setExporting] = useState(false);
   const [splitting, setSplitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<EditorMode>('clip');
+  const [layers, setLayers] = useState<AudioLayer[]>([]);
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
+  const [layerHistory, setLayerHistory] = useState<LayerHistory>({ past: [], future: [] });
+  const [importing, setImporting] = useState(false);
 
   const decodeTask = useTask<AudioBuffer>();
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const timeTextRef = useRef<HTMLSpanElement | null>(null);
+  const layerTimeTextRef = useRef<HTMLSpanElement | null>(null);
   const previewRef = useRef<AudioBuffer | null>(null);
   const playheadRef = useRef(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const startedAtRef = useRef(0);
+  const layerInputRef = useRef<HTMLInputElement | null>(null);
+  const addTargetLayerRef = useRef<string | null>(null);
+  const modeRef = useRef<EditorMode>('clip');
+  const settingsRef = useRef<EditorSettings | null>(null);
+  const layersRef = useRef<AudioLayer[]>([]);
+  const clipSettingsRef = useRef<EditorSettings | null>(null);
+  const layerSettingsRef = useRef<EditorSettings | null>(null);
 
-  const baseName = useMemo(() => (file ? stripExt(file.name) : 'audio'), [file]);
-  const fadeMax = base ? Math.max(0.05, Math.min(advanced ? 10 : 5, base.duration)) : 5;
+  modeRef.current = mode;
+  settingsRef.current = settings;
+  layersRef.current = layers;
+
+  const baseName = useMemo(() => {
+    if (file) return stripExt(file.name);
+    if (mode === 'layers') {
+      const firstClip = layers.flatMap((layer) => layer.clips)[0];
+      if (firstClip) return stripExt(firstClip.name);
+    }
+    return 'mix';
+  }, [file, mode, layers]);
+  const timelineDuration = useMemo(() => Math.max(0.1, timelineEnd(layers)), [layers]);
+  const hasClips = useMemo(
+    () => layers.some((layer) => layer.clips.length > 0),
+    [layers],
+  );
+  const selectedClip = useMemo(
+    () => (selectedClipId ? findClip(layers, selectedClipId)?.clip ?? null : null),
+    [layers, selectedClipId],
+  );
+  const fadeMax = base
+    ? Math.max(0.05, Math.min(advanced ? 10 : 5, base.duration))
+    : Math.max(0.05, Math.min(advanced ? 10 : 5, timelineDuration));
   const sampleRateOptions = useMemo(
     () => [
-      { value: '0', label: `Source (${base?.sampleRate ?? 44100} Hz)` },
+      {
+        value: '0',
+        label: `Source (${
+          base?.sampleRate ??
+          layers.flatMap((layer) => layer.clips)[0]?.buffer.sampleRate ??
+          44100
+        } Hz)`,
+      },
       { value: '22050', label: '22,050 Hz' },
       { value: '32000', label: '32,000 Hz' },
       { value: '44100', label: '44,100 Hz' },
       { value: '48000', label: '48,000 Hz' },
       { value: '96000', label: '96,000 Hz' },
     ],
-    [base],
+    [base, layers],
   );
 
   const messageOf = useCallback((value: unknown) => toUserMessage(value), []);
@@ -211,8 +282,18 @@ export function AudioEditor({ variant }: { variant: Variant }) {
   }, []);
 
   const updateTimeLabel = useCallback(() => {
-    if (!timeTextRef.current) return;
+    const speed = settingsRef.current?.speed ?? 1;
     const duration = previewRef.current?.duration ?? 0;
+    if (modeRef.current === 'layers') {
+      if (layerTimeTextRef.current) {
+        layerTimeTextRef.current.textContent = `${formatTime(
+          playheadRef.current * speed,
+          true,
+        )} / ${formatTime(duration * speed, true)}`;
+      }
+      return;
+    }
+    if (!timeTextRef.current) return;
     timeTextRef.current.textContent = `${formatTime(playheadRef.current, true)} / ${formatTime(duration, true)}`;
   }, []);
 
@@ -289,7 +370,16 @@ export function AudioEditor({ variant }: { variant: Variant }) {
   }, [playhead, playing, drawWaveform, updateTimeLabel]);
 
   useEffect(() => {
-    if (!base || !settings) return;
+    if (!settings) return;
+    if (mode === 'layers' && !hasClips) {
+      stopPlayback();
+      setPreview(null);
+      setProcessing(false);
+      setError(null);
+      return;
+    }
+    if (mode === 'clip' && !base) return;
+
     let cancelled = false;
     stopPlayback();
     setProcessing(true);
@@ -297,10 +387,28 @@ export function AudioEditor({ variant }: { variant: Variant }) {
     const timer = window.setTimeout(() => {
       void (async () => {
         try {
-          const next = await renderEditedBuffer(base, settings);
+          let next: AudioBuffer;
+          if (mode === 'layers') {
+            const sourceRate =
+              settings.sampleRate ||
+              layers.flatMap((layer) => layer.clips)[0]?.buffer.sampleRate ||
+              48000;
+            const mix = mixLayers(layers, sourceRate);
+            next = await renderEditedBuffer(mix, {
+              ...settings,
+              trimStart: 0,
+              trimEnd: mix.duration,
+            });
+          } else {
+            if (!base) return;
+            next = await renderEditedBuffer(base, settings);
+          }
           if (!cancelled) setPreview(next);
         } catch (failure) {
-          if (!cancelled) setError(messageOf(failure));
+          if (!cancelled) {
+            setError(messageOf(failure));
+            if (mode === 'layers') setPreview(null);
+          }
         } finally {
           if (!cancelled) setProcessing(false);
         }
@@ -310,7 +418,17 @@ export function AudioEditor({ variant }: { variant: Variant }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [base, settings, stopPlayback, messageOf]);
+  }, [base, hasClips, layers, messageOf, mode, settings, stopPlayback]);
+
+  useEffect(() => {
+    if (mode === 'layers' && layers.length > 0 && !settings) {
+      setSettings({
+        ...defaultEditorSettings(Math.max(0.1, timelineEnd(layers))),
+        sampleRate: 0,
+        channels: 'source',
+      });
+    }
+  }, [layers, mode, settings]);
 
   useEffect(() => () => stopPlayback(), [stopPlayback]);
 
@@ -431,6 +549,16 @@ export function AudioEditor({ variant }: { variant: Variant }) {
     );
 
   const pushHistory = () => {
+    if (mode === 'layers') {
+      setLayerHistory((previous) => ({
+        past: [
+          ...previous.past.slice(-(MAX_HISTORY - 1)),
+          { layers: cloneLayers(layers), settings },
+        ],
+        future: [],
+      }));
+      return;
+    }
     if (!base || !settings) return;
     setHistory((previous) => ({
       past: [...previous.past.slice(-(MAX_HISTORY - 1)), { buffer: base, settings }],
@@ -439,6 +567,27 @@ export function AudioEditor({ variant }: { variant: Variant }) {
   };
 
   const undo = () => {
+    if (mode === 'layers') {
+      if (layerHistory.past.length === 0) return;
+      const snapshot = layerHistory.past[layerHistory.past.length - 1];
+      stopPlayback();
+      setLayerHistory({
+        past: layerHistory.past.slice(0, -1),
+        future: [{ layers: cloneLayers(layers), settings }, ...layerHistory.future].slice(
+          0,
+          MAX_HISTORY,
+        ),
+      });
+      setLayers(cloneLayers(snapshot.layers));
+      setSettings(snapshot.settings);
+      setSelectedLayerId(snapshot.layers[0]?.id ?? null);
+      setSelectedClipId(null);
+      setSplitFiles([]);
+      setExportInfo(null);
+      setPlayhead(0);
+      playheadRef.current = 0;
+      return;
+    }
     if (!base || !settings || history.past.length === 0) return;
     const snapshot = history.past[history.past.length - 1];
     stopPlayback();
@@ -455,6 +604,27 @@ export function AudioEditor({ variant }: { variant: Variant }) {
   };
 
   const redo = () => {
+    if (mode === 'layers') {
+      if (layerHistory.future.length === 0) return;
+      const snapshot = layerHistory.future[0];
+      stopPlayback();
+      setLayerHistory({
+        past: [
+          ...layerHistory.past,
+          { layers: cloneLayers(layers), settings },
+        ].slice(-MAX_HISTORY),
+        future: layerHistory.future.slice(1),
+      });
+      setLayers(cloneLayers(snapshot.layers));
+      setSettings(snapshot.settings);
+      setSelectedLayerId(snapshot.layers[0]?.id ?? null);
+      setSelectedClipId(null);
+      setSplitFiles([]);
+      setExportInfo(null);
+      setPlayhead(0);
+      playheadRef.current = 0;
+      return;
+    }
     if (!base || !settings || history.future.length === 0) return;
     const snapshot = history.future[0];
     stopPlayback();
@@ -503,6 +673,290 @@ export function AudioEditor({ variant }: { variant: Variant }) {
     });
   };
 
+  const switchMode = (next: EditorMode) => {
+    if (next === mode) return;
+    stopPlayback();
+    setError(null);
+    setSplitFiles([]);
+    setExportInfo(null);
+    setPlayhead(0);
+    playheadRef.current = 0;
+
+    if (next === 'layers') {
+      clipSettingsRef.current = settings;
+      const existingLayers = layers.length > 0;
+      const warm = previewRef.current ?? base;
+      let nextLayers = layers;
+      if (nextLayers.length === 0 && warm) {
+        const layer: AudioLayer = {
+          id: newAudioId('layer'),
+          name: 'Layer 1',
+          volume: 100,
+          muted: false,
+          solo: false,
+          clips: [
+            {
+              id: newAudioId('clip'),
+              name: baseName,
+              buffer: warm,
+              start: 0,
+              offset: 0,
+              duration: warm.duration,
+            },
+          ],
+        };
+        nextLayers = [layer];
+        setLayers(nextLayers);
+        setSelectedLayerId(layer.id);
+        setSelectedClipId(layer.clips[0].id);
+      } else if (nextLayers.length > 0) {
+        setSelectedLayerId(nextLayers[0].id);
+        setSelectedClipId(nextLayers[0].clips[0]?.id ?? null);
+      }
+      const restored = layerSettingsRef.current;
+      if (restored) {
+        setSettings(restored);
+      } else if (warm || nextLayers.length) {
+        setSettings({
+          ...defaultEditorSettings(Math.max(0.1, timelineEnd(nextLayers))),
+          sampleRate: 0,
+          channels: 'source',
+        });
+      }
+      if (warm && !existingLayers) setPreview(warm);
+      if (existingLayers) setPreview(null);
+      setMode('layers');
+      modeRef.current = 'layers';
+      return;
+    }
+
+    layerSettingsRef.current = settings;
+    setSettings(clipSettingsRef.current ?? (base ? defaultEditorSettings(base.duration) : null));
+    setPreview(base);
+    setMode('clip');
+    modeRef.current = 'clip';
+  };
+
+  const openLayerPicker = (targetLayerId: string | null) => {
+    addTargetLayerRef.current = targetLayerId;
+    layerInputRef.current?.click();
+  };
+
+  const importLayerFiles = async (files: File[]) => {
+    if (!files.length || importing) return;
+    setImporting(true);
+    setError(null);
+    const accepted: Array<{ name: string; buffer: AudioBuffer }> = [];
+    try {
+      for (const file of files) {
+        if (file.size > MAX_AUDIO_BYTES) {
+          toast.error(`"${file.name}" is larger than the 100 MB editor limit.`);
+          continue;
+        }
+        try {
+          accepted.push({ name: stripExt(file.name), buffer: await decodeAudio(file) });
+        } catch (failure) {
+          toast.error(`"${file.name}": ${messageOf(failure)}`);
+        }
+      }
+      if (!accepted.length) return;
+
+      stopPlayback();
+      const current = layersRef.current;
+      const targetId = addTargetLayerRef.current;
+      addTargetLayerRef.current = null;
+      const next = cloneLayers(current);
+      const speed = settingsRef.current?.speed ?? 1;
+      const start = clamp(playheadRef.current * speed, 0, Math.max(0, timelineEnd(current)));
+
+      setLayerHistory((previous) => ({
+        past: [
+          ...previous.past.slice(-(MAX_HISTORY - 1)),
+          { layers: cloneLayers(current), settings: settingsRef.current },
+        ],
+        future: [],
+      }));
+
+      const target = targetId ? next.find((layer) => layer.id === targetId) : null;
+      if (target) {
+        let cursor = start;
+        for (const item of accepted) {
+          const clipStart = nextFreeStart(target, cursor, item.buffer.duration);
+          const clip: AudioClip = {
+            id: newAudioId('clip'),
+            name: item.name,
+            buffer: item.buffer,
+            start: clipStart,
+            offset: 0,
+            duration: item.buffer.duration,
+          };
+          target.clips.push(clip);
+          cursor = clipStart + item.buffer.duration;
+        }
+        setSelectedLayerId(target.id);
+        setSelectedClipId(target.clips[target.clips.length - 1]?.id ?? null);
+      } else {
+        for (const item of accepted) {
+          const layer: AudioLayer = {
+            id: newAudioId('layer'),
+            name: item.name,
+            volume: 100,
+            muted: false,
+            solo: false,
+            clips: [
+              {
+                id: newAudioId('clip'),
+                name: item.name,
+                buffer: item.buffer,
+                start: 0,
+                offset: 0,
+                duration: item.buffer.duration,
+              },
+            ],
+          };
+          next.push(layer);
+        }
+        const last = next[next.length - 1];
+        if (last) {
+          setSelectedLayerId(last.id);
+          setSelectedClipId(last.clips[0]?.id ?? null);
+        }
+      }
+
+      setLayers(next);
+      if (!settingsRef.current) {
+        setSettings({
+          ...defaultEditorSettings(Math.max(0.1, timelineEnd(next))),
+          sampleRate: 0,
+          channels: 'source',
+        });
+      }
+      setSplitFiles([]);
+      setExportInfo(null);
+      toast.success(
+        `${accepted.length} clip${accepted.length === 1 ? '' : 's'} added to the timeline.`,
+      );
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const addLayer = () => {
+    pushHistory();
+    const layer: AudioLayer = {
+      id: newAudioId('layer'),
+      name: `Layer ${layers.length + 1}`,
+      volume: 100,
+      muted: false,
+      solo: false,
+      clips: [],
+    };
+    setLayers((previous) => [...previous, layer]);
+    setSelectedLayerId(layer.id);
+    setSelectedClipId(null);
+  };
+
+  const removeLayer = (layerId: string) => {
+    if (layers.length <= 1) {
+      toast.error('Keep at least one layer on the timeline.');
+      return;
+    }
+    pushHistory();
+    const next = layers.filter((layer) => layer.id !== layerId);
+    setLayers(next);
+    if (selectedLayerId === layerId) setSelectedLayerId(next[0]?.id ?? null);
+    if (selectedClipId && !findClip(next, selectedClipId)) setSelectedClipId(null);
+  };
+
+  const updateLayer = (
+    layerId: string,
+    patch: Partial<Pick<AudioLayer, 'volume' | 'muted' | 'solo' | 'name'>>,
+  ) => {
+    setLayers((previous) =>
+      previous.map((layer) => (layer.id === layerId ? { ...layer, ...patch } : layer)),
+    );
+  };
+
+  const toggleLayerFlag = (layerId: string, key: 'muted' | 'solo') => {
+    const layer = layers.find((item) => item.id === layerId);
+    if (!layer) return;
+    pushHistory();
+    updateLayer(layerId, key === 'muted' ? { muted: !layer.muted } : { solo: !layer.solo });
+  };
+
+  const cutClipsAtPlayhead = () => {
+    if (!settings) return;
+    const at = playheadRef.current * settings.speed;
+    const next = cloneLayers(layers);
+    let count = 0;
+    let newSelected: string | null = null;
+
+    const selected = selectedClipId ? findClip(next, selectedClipId) : null;
+    if (selected) {
+      const split = splitClip(selected.clip, at);
+      if (split) {
+        const layer = next.find((item) => item.id === selected.layer.id);
+        if (layer) {
+          const index = layer.clips.findIndex((item) => item.id === selected.clip.id);
+          if (index >= 0) {
+            layer.clips.splice(index, 1, split.left, split.right);
+            count = 1;
+            newSelected = split.right.id;
+          }
+        }
+      }
+    }
+
+    if (count === 0) {
+      for (const layer of next) {
+        const clips: AudioClip[] = [];
+        for (const clip of layer.clips) {
+          const split = splitClip(clip, at);
+          if (split) {
+            clips.push(split.left, split.right);
+            count += 1;
+            newSelected = split.right.id;
+          } else {
+            clips.push(clip);
+          }
+        }
+        layer.clips = clips;
+      }
+    }
+
+    if (count === 0) {
+      toast.error('Move the playhead inside a clip before cutting.');
+      return;
+    }
+    pushHistory();
+    setLayers(next);
+    setSelectedClipId(newSelected);
+    toast.success(
+      count === 1 ? 'Clip cut at the playhead.' : `${count} clips cut at the playhead.`,
+    );
+  };
+
+  const deleteSelectedClip = () => {
+    if (!selectedClipId) {
+      toast.error('Select a clip on the timeline first.');
+      return;
+    }
+    pushHistory();
+    setLayers((previous) =>
+      previous.map((layer) => ({
+        ...layer,
+        clips: layer.clips.filter((clip) => clip.id !== selectedClipId),
+      })),
+    );
+    setSelectedClipId(null);
+    toast.success('Clip removed. Undo restores it.');
+  };
+
+  const seekTimeline = (seconds: number) => {
+    const speed = settingsRef.current?.speed ?? 1;
+    seekTo(seconds / Math.max(0.25, speed));
+  };
+
   const handleCut = () => {
     if (!base || !settings) return;
     if (settings.trimEnd - settings.trimStart < 0.02) {
@@ -541,7 +995,7 @@ export function AudioEditor({ variant }: { variant: Variant }) {
     setExporting(true);
     setError(null);
     try {
-      const output = await encodeOutput(buffer, '-edited');
+      const output = await encodeOutput(buffer, mode === 'layers' ? '-mix' : '-edited');
       downloadBlob(output.blob, output.name);
       setExportInfo({ name: output.name, size: output.blob.size });
       toast.success(`${output.name} is ready.`);
@@ -607,7 +1061,93 @@ export function AudioEditor({ variant }: { variant: Variant }) {
     setSplitFiles([]);
     setExportInfo(null);
     setError(null);
+    setMode('clip');
+    modeRef.current = 'clip';
+    setLayers([]);
+    setSelectedLayerId(null);
+    setSelectedClipId(null);
+    setLayerHistory({ past: [], future: [] });
+    setImporting(false);
+    clipSettingsRef.current = null;
+    layerSettingsRef.current = null;
+    addTargetLayerRef.current = null;
   };
+
+  const canUndo = mode === 'layers' ? layerHistory.past.length > 0 : history.past.length > 0;
+  const canRedo = mode === 'layers' ? layerHistory.future.length > 0 : history.future.length > 0;
+  const clipCount = layers.reduce((sum, layer) => sum + layer.clips.length, 0);
+
+  const modeSwitch = (
+    <div className="row spread" style={{ gap: 12, flexWrap: 'wrap' }}>
+      <div>
+        <div className="strong tiny">Editing mode</div>
+        <div className="dim tiny">
+          {mode === 'layers'
+            ? 'Stack clips on layers, drag them, and cut them at the playhead.'
+            : 'Edit one clip with the simple trim, cut and preview workflow.'}
+        </div>
+      </div>
+      <Segmented
+        options={[
+          { value: 'clip', label: 'Single clip' },
+          { value: 'layers', label: 'Multi-layer' },
+        ]}
+        value={mode}
+        size="sm"
+        onChange={(value) => switchMode(value as EditorMode)}
+      />
+    </div>
+  );
+
+  const layerFileInput = (
+    <input
+      ref={layerInputRef}
+      type="file"
+      accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm"
+      multiple
+      hidden
+      onChange={(event) => {
+        const files = Array.from(event.target.files ?? []);
+        event.target.value = '';
+        void importLayerFiles(files);
+      }}
+    />
+  );
+
+  const layerExportPanel = (
+    <Panel title="Mixdown & export">
+      <div className="row spread" style={{ gap: 12, flexWrap: 'wrap' }}>
+        <div className="stack-sm grow" style={{ minWidth: 220 }}>
+          <div className="strong">
+            {format.toUpperCase()}{' '}
+            {format === 'wav'
+              ? `${settings?.bitDepth ?? 16}-bit ${preview?.sampleRate ?? 48000} Hz`
+              : `${bitrate} kbps`}
+          </div>
+          <div className="dim tiny">
+            {formatTime(preview?.duration ?? 0, true)} mix · {layers.length} layer
+            {layers.length === 1 ? '' : 's'} · {clipCount} clip
+            {clipCount === 1 ? '' : 's'}
+          </div>
+        </div>
+        <Button
+          variant="primary"
+          icon={<Download />}
+          onClick={() => void handleExport()}
+          loading={exporting}
+          disabled={processing || !preview}
+        >
+          Export mix
+        </Button>
+      </div>
+      {exportInfo && (
+        <div className="grid-2" style={{ marginTop: 12 }}>
+          <Stat label="File" value={exportInfo.name} />
+          <Stat label="Size" value={formatBytes(exportInfo.size)} />
+        </div>
+      )}
+    </Panel>
+  );
 
   return (
     <ToolShell
@@ -932,15 +1472,321 @@ export function AudioEditor({ variant }: { variant: Variant }) {
         </>
       }
       info={
-        preview
-          ? `${formatTime(preview.duration)} · ${preview.sampleRate} Hz · ${
-              preview.numberOfChannels === 1 ? 'mono' : 'stereo'
-            }`
-          : undefined
+        <span className="hide-mobile">
+          {mode === 'layers'
+            ? layers.length
+              ? `${formatTime(timelineDuration)} timeline · ${layers.length} layer${
+                  layers.length === 1 ? '' : 's'
+                } · ${clipCount} clip${clipCount === 1 ? '' : 's'}`
+              : ''
+            : preview
+              ? `${formatTime(preview.duration)} · ${preview.sampleRate} Hz · ${
+                  preview.numberOfChannels === 1 ? 'mono' : 'stereo'
+                }`
+              : ''}
+        </span>
       }
     >
-      {!file || !base || !settings ? (
+      {layerFileInput}
+      {mode === 'layers' ? (
+        layers.length === 0 ? (
+          <div className="stack">
+            {modeSwitch}
+            {importing && (
+              <Panel>
+                <div className="row" style={{ gap: 14 }}>
+                  <Spinner />
+                  <div>
+                    <div className="strong">Decoding clips…</div>
+                    <div className="dim tiny">Building your multi-layer timeline locally.</div>
+                  </div>
+                </div>
+              </Panel>
+            )}
+            {error && <Notice tone="error">{error}</Notice>}
+            <DropZone
+              onFiles={(files) => void importLayerFiles(files)}
+              accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm"
+              multiple
+              size="lg"
+              icon={<Layers />}
+              title="Drop audio clips to build a multi-layer mix"
+              hint="Each file becomes its own layer. Add more clips to any layer from the timeline."
+              formats={['MP3', 'WAV', 'OGG', 'M4A', 'AAC', 'FLAC']}
+              disabled={importing}
+            />
+            <Panel title="Multi-layer workflow">
+              <ol className="stack-sm" style={{ margin: 0, paddingLeft: 18 }}>
+                <li>Drop one or more audio files. Each file opens as a layer on the timeline.</li>
+                <li>Drag clips to move them, or drag a clip edge to trim it. Use Add audio on a layer to stack more clips.</li>
+                <li>Click the timeline to place the playhead, then use Cut clip to split the selected clip.</li>
+                <li>Mute, solo and balance layers, then export the mix as MP3 or WAV.</li>
+              </ol>
+            </Panel>
+            <Notice tone="info">
+              Everything stays in this browser. Files up to 100 MB each. The original audio is
+              never modified.
+            </Notice>
+          </div>
+        ) : (
+          <div className="stack">
+            {modeSwitch}
+            {error && (
+              <Notice tone="error" title="The mix could not be rendered">
+                {error}
+              </Notice>
+            )}
+
+            <Panel
+              title="Multi-layer timeline"
+              actions={
+                <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                  <Badge tone="neutral">
+                    {layers.length} layer{layers.length === 1 ? '' : 's'}
+                  </Badge>
+                  <Badge tone="neutral">
+                    {clipCount} clip{clipCount === 1 ? '' : 's'}
+                  </Badge>
+                  {processing && <Badge tone="info">Rendering…</Badge>}
+                </div>
+              }
+            >
+              <div
+                className="row spread"
+                style={{ gap: 8, flexWrap: 'wrap', marginBottom: 10 }}
+              >
+                <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    icon={<Scissors />}
+                    onClick={cutClipsAtPlayhead}
+                    disabled={processing || !preview}
+                  >
+                    Cut clip
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<Trash2 />}
+                    onClick={deleteSelectedClip}
+                    disabled={!selectedClip}
+                  >
+                    Delete clip
+                  </Button>
+                </div>
+                <span className="dim tiny">
+                  {selectedClip
+                    ? `Selected: ${selectedClip.name} · ${formatTime(selectedClip.duration, true)}`
+                    : 'Click a clip to select it'}
+                </span>
+              </div>
+
+              <LayerTimeline
+                layers={layers}
+                selectedLayerId={selectedLayerId}
+                selectedClipId={selectedClipId}
+                playhead={playhead}
+                playheadRef={playheadRef}
+                speed={settings?.speed ?? 1}
+                playing={playing}
+                onSelect={(layerId, clipId) => {
+                  setSelectedLayerId(layerId);
+                  setSelectedClipId(clipId);
+                }}
+                onSeek={seekTimeline}
+                onLayersChange={setLayers}
+                onDragStart={pushHistory}
+                onTogglePlay={togglePlay}
+                onDeleteClip={deleteSelectedClip}
+              />
+
+              <div className="row spread" style={{ marginTop: 12, gap: 12, flexWrap: 'wrap' }}>
+                <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+                  <Button
+                    variant="primary"
+                    icon={playing ? <Pause /> : <Play />}
+                    onClick={togglePlay}
+                    disabled={processing || !preview}
+                  >
+                    {playing ? 'Pause' : 'Play'}
+                  </Button>
+                  <span className="mono tiny" ref={layerTimeTextRef} style={{ minWidth: 132 }}>
+                    {formatTime(playhead * (settings?.speed ?? 1), true)} /{' '}
+                    {formatTime((preview?.duration ?? 0) * (settings?.speed ?? 1), true)}
+                  </span>
+                </div>
+                <div className="row" style={{ gap: 6 }}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<Undo2 />}
+                    onClick={undo}
+                    disabled={!canUndo}
+                  >
+                    Undo
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={<Redo2 />}
+                    onClick={redo}
+                    disabled={!canRedo}
+                  >
+                    Redo
+                  </Button>
+                </div>
+              </div>
+              <div className="field-hint" style={{ marginTop: 6 }}>
+                Drag a clip to move it, drag its edges to trim, or drag it onto another layer.
+                Cut clip splits at the playhead; Delete removes the selected clip.
+              </div>
+            </Panel>
+
+            <Panel
+              title="Layers"
+              actions={
+                <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    icon={<Plus />}
+                    onClick={addLayer}
+                    disabled={importing}
+                  >
+                    Add layer
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    icon={<Music />}
+                    onClick={() => openLayerPicker(null)}
+                    loading={importing}
+                  >
+                    Add audio
+                  </Button>
+                </div>
+              }
+            >
+              <div className="stack-sm">
+                {layers.map((layer) => (
+                  <div
+                    key={layer.id}
+                    className={`layer-row ${
+                      selectedLayerId === layer.id ? 'layer-row-selected' : ''
+                    }`}
+                    onClick={() => {
+                      setSelectedLayerId(layer.id);
+                      if (!layer.clips.some((clip) => clip.id === selectedClipId)) {
+                        setSelectedClipId(layer.clips[0]?.id ?? null);
+                      }
+                    }}
+                  >
+                    <div className="row spread" style={{ gap: 8 }}>
+                      <div className="row" style={{ gap: 6, minWidth: 0 }}>
+                        <Layers size={14} />
+                        <span
+                          className="strong tiny"
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {layer.name}
+                        </span>
+                        <span className="dim tiny">
+                          {layer.clips.length} clip{layer.clips.length === 1 ? '' : 's'}
+                        </span>
+                      </div>
+                      <div className="row" style={{ gap: 4 }}>
+                        <Button
+                          size="sm"
+                          variant={layer.muted ? 'secondary' : 'ghost'}
+                          aria-label={`${layer.muted ? 'Unmute' : 'Mute'} ${layer.name}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleLayerFlag(layer.id, 'muted');
+                          }}
+                        >
+                          M
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={layer.solo ? 'secondary' : 'ghost'}
+                          aria-label={`${layer.solo ? 'Unsolo' : 'Solo'} ${layer.name}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleLayerFlag(layer.id, 'solo');
+                          }}
+                        >
+                          S
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={<Plus />}
+                          aria-label={`Add a clip to ${layer.name}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openLayerPicker(layer.id);
+                          }}
+                          disabled={importing}
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon={<Trash2 />}
+                          aria-label={`Remove ${layer.name}`}
+                          disabled={layers.length === 1}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            removeLayer(layer.id);
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="row" style={{ gap: 8 }}>
+                      <Volume2 size={14} />
+                      <input
+                        type="range"
+                        className="range"
+                        min={0}
+                        max={200}
+                        step={1}
+                        value={layer.volume}
+                        aria-label={`${layer.name} volume`}
+                        onPointerDown={pushHistory}
+                        onKeyDown={(event) => {
+                          if (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End') {
+                            pushHistory();
+                          }
+                        }}
+                        onChange={(event) =>
+                          updateLayer(layer.id, { volume: Number(event.target.value) })
+                        }
+                      />
+                      <span className="mono tiny" style={{ width: 38, textAlign: 'right' }}>
+                        {layer.volume}%
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+
+            {layerExportPanel}
+
+            <Notice tone="info">
+              The mix is rendered from all audible layers. Solo overrides mute, and master
+              settings in the sidebar (gain, EQ, compression, fades, speed and pitch) apply to the
+              finished mix. Your source files are never modified.
+            </Notice>
+          </div>
+        )
+      ) : !file || !base || !settings ? (
         <div className="stack">
+          {modeSwitch}
           {decodeTask.running && (
             <Panel>
               <div className="row" style={{ gap: 14 }}>
@@ -990,6 +1836,7 @@ export function AudioEditor({ variant }: { variant: Variant }) {
         </div>
       ) : (
         <div className="stack">
+          {modeSwitch}
           {error && (
             <Notice tone="error" title="The last change could not be rendered">
               {error}
@@ -1080,7 +1927,7 @@ export function AudioEditor({ variant }: { variant: Variant }) {
                   variant="ghost"
                   icon={<Undo2 />}
                   onClick={undo}
-                  disabled={history.past.length === 0}
+                  disabled={!canUndo}
                 >
                   Undo
                 </Button>
@@ -1089,7 +1936,7 @@ export function AudioEditor({ variant }: { variant: Variant }) {
                   variant="ghost"
                   icon={<Redo2 />}
                   onClick={redo}
-                  disabled={history.future.length === 0}
+                  disabled={!canRedo}
                 >
                   Redo
                 </Button>

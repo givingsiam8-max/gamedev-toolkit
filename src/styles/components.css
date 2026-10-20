@@ -1150,6 +1150,43 @@ button.chip:hover {
   min-width: 0;
 }
 
+@media (max-width: 640px) {
+  .hide-mobile {
+    display: none;
+  }
+}
+
+/* Multi-layer audio editor */
+.layer-timeline {
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.35);
+  outline: none;
+}
+.layer-timeline:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.layer-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  cursor: pointer;
+}
+.layer-row:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+.layer-row-selected {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-2));
+}
+.layer-row .range {
+  flex: 1;
+  min-width: 80px;
+}
+
 /* Reduced motion: honour the OS preference */
 @media (prefers-reduced-motion: reduce) {
   *,

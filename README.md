@@ -35,7 +35,7 @@ Node 20+ is required.
 | Material Tools | PBR material preview (six map slots, five lighting presets), material exporter |
 | Unity Tools | GUID generator/inspector, `.meta` generator, layer bitmask calculator, quaternion/vector/colour utilities, transform converter, frame budget calculator |
 | Sprite Tools | Sheet generator, sheet splitter, alpha-based auto slicer |
-| Audio Tools | Easy Audio Editor (waveform trim/cut/split, speed, pitch, fades, undo/redo, MP3/WAV), Advanced Audio Editor (adds BPM, gain, sample rate, bit depth, channels, normalization, compression, EQ, export quality) |
+| Audio Tools | Easy Audio Editor and Advanced Audio Editor: single-clip waveform editing plus a multi-clip, multi-layer timeline with drag, edge trim, cut clip, mute/solo/volume and mixed MP3/WAV export |
 | Animation Tools | GIF viewer, GIF→frames, GIF→sprite sheet, frames→GIF, animation preview, sequence organizer |
 | File Conversion | ZIP archive tool, SVG→PNG, ICO generator, Base64 file converter, text encoding converter |
 | Developer Tools | JSON formatter/validator, XML formatter, YAML viewer, regex tester, text diff, minifier, case converter, Base64/URL encoders, UUID and hash generators |
@@ -46,6 +46,21 @@ Node 20+ is required.
 
 Dashboard features quick tools, recents, favourites, "you may also need" suggestions, global search
 (`Ctrl/Cmd+K`), and persistent local preferences.
+
+### Audio editing and multi-layer mixes
+
+Both audio editors share the same workspace. **Single clip** mode handles one file with a waveform,
+trim markers, destructive cut with undo, split-at-playhead export, speed, pitch, volume, fades and
+MP3/WAV export. **Multi-layer** mode turns the same file into a timeline track and supports:
+
+- adding audio files as new layers, or adding clips to a selected layer at the playhead;
+- dragging clips horizontally or onto another layer, and dragging clip edges to trim;
+- cutting the selected clip at the playhead (or every clip the playhead crosses when none is
+  selected), deleting clips, and undoing/restoring both actions;
+- per-layer volume, mute and solo;
+- a mixdown preview and export that runs through the same master settings as single-clip mode
+  (gain, fades, normalization, compression, EQ, speed, pitch, channels, sample rate, bit depth);
+- a 24-bit WAV export option alongside 16-bit WAV and MP3.
 
 ### FBX component split
 
@@ -118,4 +133,6 @@ repository's Pages configuration.
 - Background removal is colour keying, not AI segmentation; it needs a flat background.
 - Texture "VRAM" and draw-call numbers are estimates from geometry, not profiler measurements.
 - Browser tools cannot encode GPU texture formats (BC7/ASTC/ETC2); those need an engine importer.
-- MP3 export is lossy at the chosen bitrate; WAV is uncompressed 16-bit PCM.
+- MP3 export is lossy at the chosen bitrate; WAV is uncompressed 16-bit or 24-bit PCM.
+- Multi-layer mixes are summed in floating point. Overlapping loud layers can exceed full scale,
+  so use layer volume, master gain or Normalize before exporting.

@@ -1141,6 +1141,15 @@ button.chip:hover {
   font-style: italic;
 }
 
+/* Audio editors: the sidebar can be long in Advanced mode, so keep its
+   controls in the normal page flow instead of a nested scroll area. */
+.audio-sidebar-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
 /* Reduced motion: honour the OS preference */
 @media (prefers-reduced-motion: reduce) {
   *,

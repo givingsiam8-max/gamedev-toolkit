@@ -312,17 +312,15 @@ subcategories: `asset`, `csharp`, `scene`, `build`, `optimization`
 
 ---
 
-## Agent E — Audio + Animation + Optimization + Utilities (16 tools)
+## Agent E — Audio + Animation + Optimization + Utilities (14 tools)
 
 `src/categories/audio/**` — id `audio`, accent `cyan`, icon `Music`
-subcategories: `convert`, `edit`, `analyze`
+subcategories: `easy`, `advanced`
 
 | id | name | sub | icon | formats | keywords |
 | --- | --- | --- | --- | --- | --- |
-| `audio-converter` | Audio Converter | convert | `Music` | MP3, WAV, OGG, M4A, FLAC, AAC | audio, convert, wav, mp3, ogg, format, encode, sample rate, bitrate, mono |
-| `audio-trimmer` | Audio Trimmer | edit | `Scissors` | WAV, MP3, OGG | trim, cut, crop, start, end, audio, export, sfx, loop |
-| `audio-gain` | Audio Level Tools | edit | `Volume2` | WAV, MP3, OGG | normalize, volume, gain, fade in, fade out, amplify, peak, decibel, loudness |
-| `waveform-viewer` | Waveform Viewer | analyze | `AudioLines` | MP3, WAV, OGG, M4A | waveform, audio analysis, peak, rms, sample rate, channels, duration, silence, clipping |
+| `easy-audio-editor` | Easy Audio Editor | easy | `Music` | MP3, WAV, OGG, M4A, AAC, FLAC | audio editor, trim, cut, split, waveform, volume, fade, speed, pitch, mute, undo, redo, mp3, wav |
+| `advanced-audio-editor` | Advanced Audio Editor | advanced | `AudioLines` | MP3, WAV, OGG, M4A, AAC, FLAC | bpm, tempo, gain, decibel, semitone, sample rate, bit depth, 24-bit, mono, stereo, normalize, compression, eq, bitrate |
 
 `src/categories/animation/**` — id `animation`, accent `orange`, icon `Film`
 subcategories: `gif`, `frames`, `preview`
@@ -356,34 +354,28 @@ subcategories: `convert`, `layout`, `text`
 
 **Implementation notes for Agent E**
 
+- Both editors share one implementation: `src/categories/audio/AudioEditor.tsx`
+  (UI, playback, undo history) and `src/categories/audio/editor.ts` (DSP).
+  `tools/easy-audio-editor.tsx` and `tools/advanced-audio-editor.tsx` are thin
+  wrappers that pass `variant="easy"` / `variant="advanced"`. Keep the workflow
+  identical: Upload → Edit → Preview → Adjust → Export.
 - Audio decoding uses `AudioContext.decodeAudioData` (available for MP3, WAV,
-  OGG, M4A/AAC, FLAC depending on the browser). Always create the
-  `AudioContext` lazily and `close()` it when done. Offer a clear error when a
-  codec is not supported by the browser.
-- `audio-converter` exports **WAV (16-bit PCM)** built by hand, and **MP3** using
-  the already-installed encoder:
-  ```ts
-  const { Mp3Encoder } = await import('@breezystack/lamejs');
-  const encoder = new Mp3Encoder(channels, sampleRate, kbps); // 1 or 2 channels
-  // feed 1152-sample Int16 chunks, collect encodeBuffer() output, then flush()
-  ```
-  Sample-rate conversion is not required — encode at the source rate and say so.
-  Offer mono downmix, bitrate (96/128/192/256/320), and a WAV bit-depth choice.
-  Never claim MP3 is lossless; state the chosen bitrate in the result.
-- WAV writing helper (put it in the tool folder, not in `core/`): 44-byte header,
-  RIFF/WAVE, `fmt ` chunk (PCM, channels, sampleRate, byteRate, blockAlign,
-  bitsPerSample), `data` chunk. Reuse it across audio tools by importing from a
-  shared file you own: `src/categories/audio/wav.ts`.
-- `audio-trimmer` and `audio-gain` should render the trimmed/processed buffer with
-  `OfflineAudioContext` or by direct sample manipulation, then export WAV
-  (and MP3 where the encoder is available). Show the resulting duration and peak.
-- `audio-gain`: peak normalisation (scan for the max sample, scale to a target
-  peak in dBFS), fixed gain in dB, fade in/out in seconds, and a simple
-  soft-clip/limiter toggle when the gain would clip. Show peak before/after and
-  whether clipping occurred.
-- `waveform-viewer`: draw peaks on a canvas (one min/max bar per pixel column),
-  with a channel selector, zoom, time rulers, RMS and peak readouts, and a
-  silence/DC-offset summary.
+  OGG, M4A/AAC, FLAC depending on the browser). Create the context lazily,
+  `close()` it when done, and offer a clear error when a codec is unsupported.
+- The render pipeline in `renderEditedBuffer` is: trim → EQ/compression
+  (`OfflineAudioContext`) → pitch → speed (OLA time stretch) → gain/fades/
+  normalization → channel conversion → sample-rate conversion. The preview and
+  the export both use this pipeline so they always match.
+- History stores `{ buffer, settings }` snapshots. Push one on slider
+  pointer-down / number-field focus and on destructive actions (cut, mute,
+  normalize, compression); undo/redo restores both the buffer and the settings.
+- WAV writing supports 16-bit and 24-bit PCM (`encodeWav` in `audio.ts`). MP3
+  uses the installed `@breezystack/lamejs` encoder; expose bitrate choices and
+  never claim MP3 is lossless.
+- Cut is destructive on the working buffer (with undo). Split cuts the rendered
+  preview at the playhead and exports both halves; it does not alter the working
+  clip. Always leave the user's original file untouched and keep everything
+  local.
 - GIF decoding: use `gifuct-js` (`parseGIF`, `decompressFrames(buffer, true)`).
   Compose each frame onto an accumulating canvas honouring `disposalType`
   (0/1 = leave, 2 = clear to background, 3 = restore previous). GIF encoding uses

@@ -24,7 +24,7 @@ Node 20+ is required.
 
 ## What is in it
 
-78 tools across 15 categories:
+76 tools across 15 categories:
 
 | Category | Tools |
 | --- | --- |
@@ -35,7 +35,7 @@ Node 20+ is required.
 | Material Tools | PBR material preview (six map slots, five lighting presets), material exporter |
 | Unity Tools | GUID generator/inspector, `.meta` generator, layer bitmask calculator, quaternion/vector/colour utilities, transform converter, frame budget calculator |
 | Sprite Tools | Sheet generator, sheet splitter, alpha-based auto slicer |
-| Audio Tools | Converter (WAV/MP3), trimmer, gain/normalize/fades, waveform viewer |
+| Audio Tools | Easy Audio Editor (waveform trim/cut/split, speed, pitch, fades, undo/redo, MP3/WAV), Advanced Audio Editor (adds BPM, gain, sample rate, bit depth, channels, normalization, compression, EQ, export quality) |
 | Animation Tools | GIF viewer, GIF→frames, GIF→sprite sheet, frames→GIF, animation preview, sequence organizer |
 | File Conversion | ZIP archive tool, SVG→PNG, ICO generator, Base64 file converter, text encoding converter |
 | Developer Tools | JSON formatter/validator, XML formatter, YAML viewer, regex tester, text diff, minifier, case converter, Base64/URL encoders, UUID and hash generators |

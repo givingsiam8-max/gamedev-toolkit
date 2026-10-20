@@ -36,11 +36,16 @@ export async function decodeAudio(file: File): Promise<AudioBuffer> {
   }
 }
 
-/** 16-bit PCM WAV with an optional mono downmix. */
-export function encodeWav(buffer: AudioBuffer, mono = false): Blob {
-  const channels = mono ? 1 : Math.min(2, buffer.numberOfChannels);
+/** PCM WAV with an optional mono downmix and 16- or 24-bit depth. */
+export function encodeWav(
+  buffer: AudioBuffer,
+  options: { mono?: boolean; bitDepth?: 16 | 24 } = {},
+): Blob {
+  const channels = options.mono ? 1 : Math.min(2, buffer.numberOfChannels);
+  const bitDepth = options.bitDepth === 24 ? 24 : 16;
+  const bytesPerSample = bitDepth / 8;
   const frames = buffer.length;
-  const dataLength = frames * channels * 2;
+  const dataLength = frames * channels * bytesPerSample;
   const out = new ArrayBuffer(44 + dataLength);
   const view = new DataView(out);
 
@@ -52,9 +57,9 @@ export function encodeWav(buffer: AudioBuffer, mono = false): Blob {
   view.setUint16(20, 1, true);
   view.setUint16(22, channels, true);
   view.setUint32(24, buffer.sampleRate, true);
-  view.setUint32(28, buffer.sampleRate * channels * 2, true);
-  view.setUint16(32, channels * 2, true);
-  view.setUint16(34, 16, true);
+  view.setUint32(28, buffer.sampleRate * channels * bytesPerSample, true);
+  view.setUint16(32, channels * bytesPerSample, true);
+  view.setUint16(34, bitDepth, true);
   writeString(view, 36, 'data');
   view.setUint32(40, dataLength, true);
 
@@ -63,14 +68,22 @@ export function encodeWav(buffer: AudioBuffer, mono = false): Blob {
   for (let i = 0; i < frames; i += 1) {
     for (let c = 0; c < channels; c += 1) {
       let sample: number;
-      if (mono && source.length > 1) {
+      if (options.mono && source.length > 1) {
         sample = source.reduce((sum, channel) => sum + channel[i], 0) / source.length;
       } else {
         sample = source[c][i];
       }
       const s = Math.max(-1, Math.min(1, sample));
-      view.setInt16(offset, s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff), true);
-      offset += 2;
+      if (bitDepth === 16) {
+        view.setInt16(offset, s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff), true);
+        offset += 2;
+      } else {
+        const value = Math.max(-8388608, Math.min(8388607, Math.round(s * 8388607)));
+        view.setUint8(offset, value & 0xff);
+        view.setUint8(offset + 1, (value >> 8) & 0xff);
+        view.setUint8(offset + 2, (value >> 16) & 0xff);
+        offset += 3;
+      }
     }
   }
 

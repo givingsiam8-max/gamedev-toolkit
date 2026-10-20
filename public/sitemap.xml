@@ -19,6 +19,12 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://givingsiam8-max.github.io/gamedev-toolkit/fbx-asset-extractor/</loc>
+    <lastmod>2026-10-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://givingsiam8-max.github.io/gamedev-toolkit/privacy/</loc>
     <lastmod>2026-10-19</lastmod>
     <changefreq>yearly</changefreq>

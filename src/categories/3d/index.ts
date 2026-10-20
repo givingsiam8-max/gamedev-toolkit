@@ -36,6 +36,17 @@ const tools: ToolDefinition[] = [
     load: () => import('./tools/texture-extractor'),
   },
   {
+    id: 'fbx-asset-extractor',
+    name: 'FBX Asset Extractor',
+    category: '3d',
+    subcategory: 'extract',
+    description: 'Extract mesh objects and embedded textures from FBX files and download them individually or as a ZIP.',
+    keywords: ['fbx', 'extract', 'mesh', 'texture', 'assets', '3d', 'obj', 'stl', 'ply', 'glb', 'zip', 'batch'],
+    formats: ['FBX'],
+    icon: Package,
+    load: () => import('./tools/fbx-asset-extractor'),
+  },
+  {
     id: 'mesh-stats',
     name: 'Mesh Statistics',
     category: '3d',

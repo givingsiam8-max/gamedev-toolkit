@@ -822,7 +822,8 @@ button.chip:hover {
 .toast-stack {
   position: fixed;
   right: 18px;
-  bottom: 18px;
+  /* Sits above the sticky action bar so toasts never cover its buttons. */
+  bottom: 86px;
   z-index: 200;
   display: flex;
   flex-direction: column;

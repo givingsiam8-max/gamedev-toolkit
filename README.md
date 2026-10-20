@@ -24,11 +24,11 @@ Node 20+ is required.
 
 ## What is in it
 
-77 tools across 15 categories:
+78 tools across 15 categories:
 
 | Category | Tools |
 | --- | --- |
-| 3D Tools | Model viewer, model converter, texture extractor, mesh statistics |
+| 3D Tools | Model viewer, model converter, FBX asset extractor, texture extractor, mesh statistics |
 | Image Tools | Format converter, resizer, compressor, cropper, batch processor, inspector |
 | Photo Editing | Full editor (crop/resize/adjust/colour/effects, undo, compare), background remover, background replacer, filters |
 | Texture Tools | Resizer, converter, compressor, channel viewer/packer, PBR map preview, seamless maker, tiling preview, atlas builder |

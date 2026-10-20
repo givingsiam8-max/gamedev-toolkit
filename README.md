@@ -47,6 +47,16 @@ Node 20+ is required.
 Dashboard features quick tools, recents, favourites, "you may also need" suggestions, global search
 (`Ctrl/Cmd+K`), and persistent local preferences.
 
+### FBX component split
+
+The FBX Asset Extractor has two modes. **Extract assets** pulls meshes and embedded textures out of
+the file. **Split components** lets you select individual mesh objects and exports each one as a
+standalone package — OBJ + MTL + `textures/`, or GLB with embedded PBR materials — even when the
+source FBX shared one material across several objects. Material definitions are duplicated per
+component (so editing one never affects another), per-face material slots, UVs and normals are
+preserved, and shared texture pixels are copied unchanged. Skinning, morph targets and animation
+are not part of component packages.
+
 ## Architecture
 
 - `src/core/` — tool registry, local preferences, file/zip/image/colour helpers, error handling.

@@ -6,7 +6,7 @@
     <title>FBX Asset Extractor — Extract Meshes and Textures Online</title>
     <meta
       name="description"
-      content="Extract mesh objects and texture assets from FBX 3D model files and download them individually or as a ZIP. Runs locally in your browser; files are never uploaded."
+      content="Extract mesh objects and texture assets from FBX files, or split components with independent materials and texture references. Runs locally in your browser; files are never uploaded."
     />
     <meta name="robots" content="index, follow, max-image-preview:large" />
     <link rel="canonical" href="https://givingsiam8-max.github.io/gamedev-toolkit/fbx-asset-extractor/" />
@@ -87,6 +87,47 @@
           </p>
         </div>
       </div>
+
+      <h2>Split components with independent materials</h2>
+      <p>
+        Switch the tool to <strong>Split components</strong> to choose individual mesh objects from
+        the FBX hierarchy. Each selected component is exported separately — not merged — with its own
+        material definitions, even when several components shared one material in the source file.
+      </p>
+      <ul>
+        <li>Per-face material slots, UVs and normals are preserved for every component.</li>
+        <li>Shared materials are duplicated per component, so editing one never changes another.</li>
+        <li>Texture references are kept; shared textures are copied unchanged into each package.</li>
+        <li>OBJ output ships an MTL file plus a <code>textures/</code> folder; GLB embeds materials and textures.</li>
+        <li>With several source FBX files, each file gets its own folder in the ZIP.</li>
+      </ul>
+
+      <pre
+        style="
+          background: #0b0e14;
+          border: 1px solid #232a37;
+          border-radius: 12px;
+          padding: 16px;
+          overflow: auto;
+          color: #a9b4c4;
+          font-size: 13px;
+          line-height: 1.6;
+        "
+      ><code>Character_Extracted/
+├── Body/
+│   ├── Body.obj
+│   ├── Body.mtl
+│   └── textures/Character.png
+└── Head/
+    ├── Head.obj
+    ├── Head.mtl
+    └── textures/Character.png</code></pre>
+
+      <p>
+        OBJ + MTL imports natively in Unity and keeps the objects separate with their own materials.
+        GLB keeps full PBR maps, including tangents, but requires a glTF importer in Unity. Skinning,
+        morph targets and animation are not included in component packages.
+      </p>
 
       <h2>How it works</h2>
       <p>

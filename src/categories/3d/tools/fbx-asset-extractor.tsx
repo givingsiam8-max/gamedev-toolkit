@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Group } from 'three';
-import { Download, FileText, Package, RefreshCw } from 'lucide-react';
+import { Download, FileText, Package, RefreshCw, ScanSearch } from 'lucide-react';
 import { ToolShell } from '../../../components/ToolShell';
 import {
   Badge,
@@ -11,6 +11,7 @@ import {
   Panel,
   ProgressBar,
   SectionTitle,
+  Segmented,
   Select,
   Stat,
   useToast,
@@ -33,6 +34,14 @@ import {
   type MeshFormat,
 } from '../fbx';
 import { disposeObject } from '../model';
+import {
+  analyzeComponents,
+  prepareComponent,
+  waitForComponentTextures,
+  type ComponentInfo,
+  type SplitFormat,
+} from '../fbx-split';
+import { exportComponentPackage, type ComponentExport } from '../fbx-split-export';
 
 const MAX_SIZE = 200 * 1024 * 1024;
 
@@ -65,6 +74,25 @@ interface FbxScanSummary {
   imageCount: number;
   referenceCount: number;
   ascii: boolean;
+}
+
+type Mode = 'assets' | 'split';
+
+interface ScannedFile {
+  id: string;
+  fileName: string;
+  folder: string;
+  components: ComponentInfo[];
+  externalRefs: string[];
+  error?: string;
+}
+
+interface SplitOutput {
+  id: string;
+  fileName: string;
+  folder: string;
+  components: ComponentExport[];
+  failures: string[];
 }
 
 function extensionOf(name: string): string {
@@ -122,6 +150,15 @@ export default function FbxAssetExtractor() {
   const [scans, setScans] = useState<Record<string, FbxScanSummary>>({});
   const task = useTask<FileResult[]>();
   const previewUrls = useRef<string[]>([]);
+  const [mode, setMode] = useState<Mode>('assets');
+  const [splitFormat, setSplitFormat] = useState<SplitFormat>('obj');
+  const [scanned, setScanned] = useState<ScannedFile[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [splitResults, setSplitResults] = useState<SplitOutput[]>([]);
+  const [splitBusy, setSplitBusy] = useState(false);
+  const scanTask = useTask<ScannedFile[]>();
+  const splitTask = useTask<SplitOutput[]>();
+  const rootsRef = useRef<Map<string, { root: Group; externalRefs: string[] }>>(new Map());
 
   useEffect(
     () => () => {
@@ -154,6 +191,229 @@ export default function FbxAssetExtractor() {
     task.reset();
   };
 
+  const clearSplit = () => {
+    for (const entry of rootsRef.current.values()) disposeObject(entry.root);
+    rootsRef.current.clear();
+    setScanned([]);
+    setSelected(new Set());
+    setSplitResults([]);
+    scanTask.reset();
+    splitTask.reset();
+  };
+
+  const scanComponents = () =>
+    scanTask.run(async (report) => {
+      if (!queue.items.length) throw new UserError('Add at least one FBX file.');
+      for (const entry of rootsRef.current.values()) disposeObject(entry.root);
+      rootsRef.current.clear();
+      setSplitResults([]);
+
+      const items = [...queue.items];
+      const output: ScannedFile[] = [];
+      const ids: string[] = [];
+
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index];
+        const label = item.file.name;
+        const folder = safeFileName(stripExt(label), 'fbx');
+        report(index / items.length, `Reading components from ${label}`);
+        queue.setStatus(item.id, 'processing', 'Scanning');
+
+        try {
+          if (!/\.fbx$/i.test(label)) throw new UserError('Only .fbx files are supported.');
+          if (item.file.size === 0) throw new UserError('The file is empty.');
+          if (item.file.size > MAX_SIZE) {
+            throw new UserError(`File is too large. Limit is ${formatBytes(MAX_SIZE)}.`);
+          }
+          const buffer = await item.file.arrayBuffer();
+          if (!isLikelyFbx(buffer)) {
+            throw new UserError('This does not look like an FBX file (unrecognized header).');
+          }
+
+          const media = scanFbxMedia(buffer);
+          const { loader, externalRefs } = createFbxLoader();
+          const root = loader.parse(buffer.slice(0), '');
+          await waitForComponentTextures(root);
+          const components = analyzeComponents(root);
+          if (!components.length) {
+            disposeObject(root);
+            throw new UserError('No mesh objects were found in this FBX.');
+          }
+
+          const refs = [...new Set([...externalRefs, ...media.references])];
+          rootsRef.current.set(item.id, { root, externalRefs: refs });
+          output.push({ id: item.id, fileName: label, folder, components, externalRefs: refs });
+          for (const component of components) ids.push(component.id);
+          queue.setStatus(item.id, 'done', `${components.length} component(s)`);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Could not scan this file.';
+          output.push({
+            id: item.id,
+            fileName: label,
+            folder,
+            components: [],
+            externalRefs: [],
+            error: message,
+          });
+          queue.setStatus(item.id, 'error', message.slice(0, 90));
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+
+      setScanned(output);
+      setSelected(new Set(ids));
+      report(1, 'Scan complete');
+      if (ids.length) toast.success(`Found ${formatNumber(ids.length)} component(s).`);
+      else toast.error('No mesh components were found.');
+      return output;
+    });
+
+  const toggleComponent = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const setFileSelection = (file: ScannedFile, select: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const component of file.components) {
+        if (select) next.add(component.id);
+        else next.delete(component.id);
+      }
+      return next;
+    });
+
+  const splitSelected = () =>
+    splitTask.run(async (report) => {
+      if (!selected.size) throw new UserError('Select at least one component.');
+      const total = selected.size;
+      let done = 0;
+      const output: SplitOutput[] = [];
+
+      for (const file of scanned) {
+        const components = file.components.filter((component) => selected.has(component.id));
+        if (!components.length) continue;
+        const entry = rootsRef.current.get(file.id);
+        const exported: ComponentExport[] = [];
+        const failures: string[] = [];
+
+        if (!entry) {
+          failures.push('The model is no longer loaded. Scan again.');
+          output.push({
+            id: file.id,
+            fileName: file.fileName,
+            folder: file.folder,
+            components: [],
+            failures,
+          });
+          continue;
+        }
+
+        for (const component of components) {
+          report(done / total, `Splitting ${component.name}`);
+          try {
+            const prepared = await prepareComponent(
+              component.mesh,
+              component.name,
+              entry.externalRefs,
+              new Set(),
+              new Set(),
+            );
+            try {
+              exported.push(await exportComponentPackage(prepared, splitFormat));
+            } finally {
+              prepared.geometry.dispose();
+              for (const material of prepared.materials) material.exportMaterial.dispose();
+            }
+          } catch (error) {
+            failures.push(
+              `${component.name}: ${error instanceof Error ? error.message : 'split failed'}`,
+            );
+          }
+          done += 1;
+          report(done / total, `Split ${done}/${total}`);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+
+        output.push({
+          id: file.id,
+          fileName: file.fileName,
+          folder: file.folder,
+          components: exported,
+          failures,
+        });
+      }
+
+      setSplitResults(output);
+      const count = output.reduce((sum, file) => sum + file.components.length, 0);
+      if (count) {
+        toast.success(`Exported ${formatNumber(count)} independent component package(s).`);
+      } else {
+        toast.error('No components were exported. See the messages below.');
+      }
+      return output;
+    });
+
+  const splitTotal = splitResults.reduce((sum, file) => sum + file.components.length, 0);
+  const splitMaterialTotal = splitResults.reduce(
+    (sum, file) => sum + file.components.reduce((s, component) => s + component.materialNames.length, 0),
+    0,
+  );
+  const splitTextureTotal = splitResults.reduce(
+    (sum, file) => sum + file.components.reduce((s, component) => s + component.textureFiles.length, 0),
+    0,
+  );
+
+  const downloadSplitZip = async () => {
+    if (!splitTotal) return;
+    setSplitBusy(true);
+    try {
+      const multi = splitResults.length > 1;
+      const folderCounts = new Map<string, number>();
+      const folderFor = (folder: string): string => {
+        const base = safeFileName(folder, 'fbx') || 'fbx';
+        const count = (folderCounts.get(base) ?? 0) + 1;
+        folderCounts.set(base, count);
+        return count === 1 ? base : `${base}-${count}`;
+      };
+      const entries: Array<{ path: string; data: Blob }> = [];
+      for (const file of splitResults) {
+        const filePrefix = multi ? `${folderFor(file.folder)}/` : '';
+        for (const component of file.components) {
+          const prefix = `${filePrefix}${component.componentName}/`;
+          for (const item of component.files) {
+            entries.push({ path: prefix + item.path, data: item.data });
+          }
+        }
+      }
+      const archive = await buildZip(entries);
+      downloadBlob(
+        archive,
+        multi ? 'fbx-components.zip' : `${splitResults[0].folder}-components.zip`,
+      );
+      toast.success(`ZIP created (${formatBytes(archive.size)}).`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not create the ZIP.');
+    } finally {
+      setSplitBusy(false);
+    }
+  };
+
+  const downloadComponentZip = async (component: ComponentExport) => {
+    try {
+      const archive = await buildZip(
+        component.files.map((file) => ({ path: file.path, data: file.data })),
+      );
+      downloadBlob(archive, `${component.componentName}.zip`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not create the ZIP.');
+    }
+  };
+
   const addFiles = (files: File[]) => {
     const oversized = files.filter((file) => file.size > MAX_SIZE);
     const usable = files.filter((file) => file.size <= MAX_SIZE);
@@ -163,7 +423,10 @@ export default function FbxAssetExtractor() {
       );
     }
     const added = queue.add(usable);
-    if (added.added) clearResults();
+    if (added.added) {
+      clearResults();
+      clearSplit();
+    }
     if (added.rejected.length) {
       toast.warning(`${added.rejected.length} file(s) are not .fbx and were skipped.`);
     }
@@ -172,6 +435,7 @@ export default function FbxAssetExtractor() {
   const removeFile = (id: string) => {
     queue.remove(id);
     if (results.length) clearResults();
+    if (scanned.length || splitResults.length) clearSplit();
   };
 
   const run = () =>
@@ -420,6 +684,7 @@ export default function FbxAssetExtractor() {
 
   const resetAll = () => {
     clearResults();
+    clearSplit();
     queue.clear();
   };
 
@@ -437,72 +702,171 @@ export default function FbxAssetExtractor() {
     <ToolShell
       sidebar={
         <>
-          <Field label="What to extract">
-            <div className="stack-sm">
-              <CheckBox
-                checked={extractMeshesOn}
-                onChange={setExtractMeshesOn}
-                label="Extract meshes"
-                hint="One file per mesh object, with world transforms baked in."
-              />
-              <CheckBox
-                checked={extractTexturesOn}
-                onChange={setExtractTexturesOn}
-                label="Extract textures"
-                hint="Embedded images are saved in their original format."
-              />
-            </div>
-          </Field>
-          <Field label="Mesh output format">
-            <Select
-              value={meshFormat}
-              onChange={(event) => setMeshFormat(event.target.value as MeshFormat)}
-              options={MESH_FORMATS}
+          <Field label="Mode">
+            <Segmented
+              options={[
+                { value: 'assets', label: 'Extract assets' },
+                { value: 'split', label: 'Split components' },
+              ]}
+              value={mode}
+              onChange={(next) => {
+                setMode(next);
+                clearSplit();
+              }}
             />
           </Field>
-          <Notice tone="info" title="How it works">
-            Geometry is read with three.js FBXLoader. Embedded textures are decoded from the FBX
-            container itself. External texture paths are listed but never fetched.
-          </Notice>
-          <Notice tone="warning" title="Limits">
-            Maximum {formatBytes(MAX_SIZE)} per file, up to 30 files per batch. Very large or unusual
-            FBX files may take a moment to parse.
-          </Notice>
+          {mode === 'assets' ? (
+            <>
+              <Field label="What to extract">
+                <div className="stack-sm">
+                  <CheckBox
+                    checked={extractMeshesOn}
+                    onChange={setExtractMeshesOn}
+                    label="Extract meshes"
+                    hint="One file per mesh object, with world transforms baked in."
+                  />
+                  <CheckBox
+                    checked={extractTexturesOn}
+                    onChange={setExtractTexturesOn}
+                    label="Extract textures"
+                    hint="Embedded images are saved in their original format."
+                  />
+                </div>
+              </Field>
+              <Field label="Mesh output format">
+                <Select
+                  value={meshFormat}
+                  onChange={(event) => setMeshFormat(event.target.value as MeshFormat)}
+                  options={MESH_FORMATS}
+                />
+              </Field>
+              <Notice tone="info" title="How it works">
+                Geometry is read with three.js FBXLoader. Embedded textures are decoded from the FBX
+                container itself. External texture paths are listed but never fetched.
+              </Notice>
+              <Notice tone="warning" title="Limits">
+                Maximum {formatBytes(MAX_SIZE)} per file, up to 30 files per batch. Very large or
+                unusual FBX files may take a moment to parse.
+              </Notice>
+            </>
+          ) : (
+            <>
+              <Field label="Export format">
+                <Select
+                  value={splitFormat}
+                  onChange={(event) => {
+                    setSplitFormat(event.target.value as SplitFormat);
+                    setSplitResults([]);
+                  }}
+                  options={[
+                    { value: 'obj', label: 'OBJ + MTL + textures' },
+                    { value: 'glb', label: 'GLB (independent materials)' },
+                  ]}
+                />
+              </Field>
+              <Notice tone="info" title="Independent components">
+                Each selected mesh object is exported on its own with duplicated material definitions
+                and its own texture files. Shared source materials never stay shared across
+                components.
+              </Notice>
+              <Notice tone="warning" title="Static split">
+                Skinning, morph targets and animation are not included. OBJ keeps UVs and normals; GLB
+                also keeps tangents and full PBR maps. Rescan after changing files.
+              </Notice>
+              <Button
+                variant="outline"
+                icon={<ScanSearch />}
+                loading={scanTask.running}
+                disabled={!queue.items.length}
+                onClick={() => void scanComponents()}
+                block
+              >
+                Scan Components
+              </Button>
+            </>
+          )}
         </>
       }
       actions={
-        <>
-          <Button variant="ghost" icon={<RefreshCw />} onClick={resetAll}>
-            Reset
-          </Button>
-          <Button
-            variant="primary"
-            icon={<Package />}
-            loading={task.running}
-            disabled={!queue.items.length || (!extractMeshesOn && !extractTexturesOn)}
-            onClick={run}
-          >
-            Extract Assets
-          </Button>
-          <Button
-            variant="success"
-            icon={<Download />}
-            disabled={!totalMeshes && !totalTextures}
-            loading={zipBusy}
-            onClick={() => void downloadAll()}
-          >
-            Download All as ZIP
-          </Button>
-        </>
+        mode === 'assets' ? (
+          <>
+            <Button variant="ghost" icon={<RefreshCw />} onClick={resetAll}>
+              Reset
+            </Button>
+            <Button
+              variant="primary"
+              icon={<Package />}
+              loading={task.running}
+              disabled={!queue.items.length || (!extractMeshesOn && !extractTexturesOn)}
+              onClick={run}
+            >
+              Extract Assets
+            </Button>
+            <Button
+              variant="success"
+              icon={<Download />}
+              disabled={!totalMeshes && !totalTextures}
+              loading={zipBusy}
+              onClick={() => void downloadAll()}
+            >
+              Download All as ZIP
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="ghost" icon={<RefreshCw />} onClick={resetAll}>
+              Reset
+            </Button>
+            <Button
+              variant="primary"
+              icon={<ScanSearch />}
+              loading={scanTask.running}
+              disabled={!queue.items.length || splitTask.running}
+              onClick={() => void scanComponents()}
+            >
+              Scan Components
+            </Button>
+            <Button
+              variant="primary"
+              icon={<Package />}
+              loading={splitTask.running}
+              disabled={!selected.size || !scanned.length || scanTask.running}
+              onClick={() => void splitSelected()}
+            >
+              Split Selected
+            </Button>
+            <Button
+              variant="success"
+              icon={<Download />}
+              loading={splitBusy}
+              disabled={!splitTotal}
+              onClick={() => void downloadSplitZip()}
+            >
+              Download ZIP
+            </Button>
+          </>
+        )
       }
       info={
-        task.running
-          ? task.message
-          : results.length
-            ? `${formatNumber(totalMeshes)} meshes · ${formatNumber(totalTextures)} textures`
-            : queue.items.length
-              ? `${formatNumber(queue.items.length)} FBX file(s) ready`
-              : undefined
+        mode === 'split'
+          ? scanTask.running || splitTask.running
+            ? scanTask.message || splitTask.message
+            : selected.size
+              ? `${formatNumber(selected.size)} component(s) selected`
+              : scanned.length
+                ? `${formatNumber(
+                    scanned.reduce((sum, file) => sum + file.components.length, 0),
+                  )} components found`
+                : queue.items.length
+                  ? `${formatNumber(queue.items.length)} FBX file(s) ready`
+                  : undefined
+          : task.running
+            ? task.message
+            : results.length
+              ? `${formatNumber(totalMeshes)} meshes · ${formatNumber(totalTextures)} textures`
+              : queue.items.length
+                ? `${formatNumber(queue.items.length)} FBX file(s) ready`
+                : undefined
       }
     >
       {queue.items.length === 0 ? (
@@ -532,6 +896,8 @@ export default function FbxAssetExtractor() {
         </Panel>
       )}
 
+      {mode === 'assets' ? (
+        <>
       {task.running && (
         <Panel title="Processing">
           <div className="stack">
@@ -736,6 +1102,213 @@ export default function FbxAssetExtractor() {
           </Panel>
         );
       })}
+        </>
+      ) : (
+        <>
+          {scanTask.error && (
+            <Notice tone="error" title="Could not scan components">
+              {scanTask.error}
+            </Notice>
+          )}
+
+          {scanTask.running && (
+            <Panel title="Scanning components">
+              <ProgressBar
+                value={scanTask.progress}
+                label={scanTask.message || 'Reading components…'}
+              />
+            </Panel>
+          )}
+
+          {!scanned.length && !scanTask.running && queue.items.length > 0 && (
+            <Notice tone="info" title="Scan first">
+              Press <strong>Scan Components</strong> to list the mesh objects inside your FBX files,
+              then choose which ones to export. Each component receives independent materials and its
+              own texture files.
+            </Notice>
+          )}
+
+          {scanned.map((file) => (
+            <Panel
+              key={file.id}
+              title={file.fileName}
+              actions={
+                <div className="row-wrap">
+                  <Badge tone={file.error ? 'danger' : 'accent'}>
+                    {file.error
+                      ? 'Scan failed'
+                      : `${formatNumber(file.components.length)} components`}
+                  </Badge>
+                  {!file.error && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setFileSelection(file, true)}
+                      >
+                        Select all
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setFileSelection(file, false)}
+                      >
+                        Clear
+                      </Button>
+                    </>
+                  )}
+                </div>
+              }
+            >
+              {file.error ? (
+                <Notice tone="error" title="This file could not be scanned">
+                  {file.error}
+                </Notice>
+              ) : (
+                <div className="stack-sm">
+                  {file.components.map((component) => (
+                    <div
+                      key={component.id}
+                      className="row"
+                      style={{ alignItems: 'flex-start', gap: 12 }}
+                    >
+                      <div className="grow" style={{ minWidth: 0 }}>
+                        <CheckBox
+                          checked={selected.has(component.id)}
+                          onChange={() => toggleComponent(component.id)}
+                          label={component.name}
+                        />
+                        <div className="dim tiny" style={{ marginLeft: 25 }}>
+                          {formatNumber(component.vertices)} verts ·{' '}
+                          {formatNumber(component.triangles)} tris ·{' '}
+                          {component.materialNames.length} material slot(s) ·{' '}
+                          {component.textureCount} texture(s)
+                        </div>
+                      </div>
+                      <div
+                        className="row-wrap"
+                        style={{ maxWidth: '52%', justifyContent: 'flex-end' }}
+                      >
+                        {component.materialNames.map((name, materialIndex) => (
+                          <span key={`${name}-${materialIndex}`} className="chip chip-format">
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  {file.externalRefs.length > 0 && (
+                    <div className="dim tiny">
+                      {formatNumber(file.externalRefs.length)} external texture reference(s) will be
+                      listed in each component report.
+                    </div>
+                  )}
+                </div>
+              )}
+            </Panel>
+          ))}
+
+          {splitTask.running && (
+            <Panel title="Splitting components">
+              <ProgressBar
+                value={splitTask.progress}
+                label={splitTask.message || 'Working…'}
+              />
+            </Panel>
+          )}
+
+          {splitTask.error && (
+            <Notice tone="error" title="Split failed">
+              {splitTask.error}
+            </Notice>
+          )}
+
+          {splitResults.length > 0 && (
+            <>
+              <div className="grid-3">
+                <Stat label="Components" value={formatNumber(splitTotal)} />
+                <Stat label="Materials" value={formatNumber(splitMaterialTotal)} />
+                <Stat label="Textures" value={formatNumber(splitTextureTotal)} />
+              </div>
+
+              {splitResults.map((file) => (
+                <Panel
+                  key={file.id}
+                  title={file.fileName}
+                  actions={
+                    <Badge tone="success">
+                      {formatNumber(file.components.length)} exported
+                    </Badge>
+                  }
+                >
+                  <div className="stack">
+                    {file.failures.length > 0 && (
+                      <Notice tone="warning" title="Some components failed">
+                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                          {file.failures.map((failure, index) => (
+                            <li key={index}>{failure}</li>
+                          ))}
+                        </ul>
+                      </Notice>
+                    )}
+
+                    {file.components.map((component) => (
+                      <div key={component.componentName} className="card">
+                        <div className="spread">
+                          <div style={{ minWidth: 0 }}>
+                            <div className="strong">{component.componentName}</div>
+                            <div className="dim tiny">
+                              {component.meshFile} · {component.materialNames.length} material(s) ·{' '}
+                              {component.textureFiles.length} texture(s)
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            icon={<Download />}
+                            onClick={() => void downloadComponentZip(component)}
+                          >
+                            Download .zip
+                          </Button>
+                        </div>
+                        <div className="row-wrap" style={{ marginTop: 8 }}>
+                          {component.materialNames.map((name) => (
+                            <span key={name} className="chip">
+                              <span className="strong">{name}</span>
+                            </span>
+                          ))}
+                        </div>
+                        {component.textureFiles.length > 0 && (
+                          <div className="dim tiny" style={{ marginTop: 6 }}>
+                            textures/{component.textureFiles.join(', textures/')}
+                          </div>
+                        )}
+                        {component.externalRefs.length > 0 && (
+                          <div className="dim tiny" style={{ marginTop: 6 }}>
+                            {formatNumber(component.externalRefs.length)} external reference(s) — see
+                            materials.json
+                          </div>
+                        )}
+                        {component.notes.length > 0 && (
+                          <div className="dim tiny" style={{ marginTop: 6 }}>
+                            {component.notes.join(' ')}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </Panel>
+              ))}
+
+              <div className="row">
+                <Button variant="outline" icon={<RefreshCw />} onClick={resetAll}>
+                  Start New Extraction
+                </Button>
+              </div>
+            </>
+          )}
+        </>
+      )}
     </ToolShell>
   );
 }

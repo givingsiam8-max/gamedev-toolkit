@@ -683,6 +683,7 @@ export default function FbxAssetExtractor() {
   };
 
   const resetAll = () => {
+    if (task.running || scanTask.running || splitTask.running) return;
     clearResults();
     clearSplit();
     queue.clear();
@@ -710,6 +711,7 @@ export default function FbxAssetExtractor() {
               ]}
               value={mode}
               onChange={(next) => {
+                if (next === mode || scanTask.running || splitTask.running) return;
                 setMode(next);
                 clearSplit();
               }}
@@ -754,6 +756,7 @@ export default function FbxAssetExtractor() {
               <Field label="Export format">
                 <Select
                   value={splitFormat}
+                  disabled={splitTask.running}
                   onChange={(event) => {
                     setSplitFormat(event.target.value as SplitFormat);
                     setSplitResults([]);
@@ -892,7 +895,11 @@ export default function FbxAssetExtractor() {
             />
           }
         >
-          <FileGrid items={queue.items} onRemove={removeFile} disabled={task.running} />
+          <FileGrid
+            items={queue.items}
+            onRemove={removeFile}
+            disabled={task.running || scanTask.running || splitTask.running}
+          />
         </Panel>
       )}
 

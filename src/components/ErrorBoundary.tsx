@@ -12,17 +12,23 @@ interface Props {
 interface State {
   error: Error | null;
   showDetail: boolean;
+  stale: boolean;
 }
+
+const isStaleChunkError = (message: string): boolean =>
+  /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(
+    message,
+  );
 
 /**
  * Keeps one broken tool from taking down the whole application, and hides
  * technical detail behind an explicit disclosure.
  */
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null, showDetail: false };
+  state: State = { error: null, showDetail: false, stale: false };
 
   static getDerivedStateFromError(error: Error): Partial<State> {
-    return { error };
+    return { error, stale: isStaleChunkError(error.message) };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
@@ -30,13 +36,37 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private reset = () => {
-    this.setState({ error: null, showDetail: false });
+    this.setState({ error: null, showDetail: false, stale: false });
     this.props.onReset?.();
   };
 
   render(): ReactNode {
-    const { error, showDetail } = this.state;
+    const { error, showDetail, stale } = this.state;
     if (!error) return this.props.children;
+
+    if (stale) {
+      return (
+        <Notice
+          tone="warning"
+          title="A new version of the toolkit is available"
+          actions={
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<RefreshCw />}
+              onClick={() => window.location.reload()}
+            >
+              Reload page
+            </Button>
+          }
+        >
+          <p>
+            The site was updated while this tab was open, so one of its code files could not be
+            loaded. Reload to pick up the new version. Nothing was uploaded and no work is lost.
+          </p>
+        </Notice>
+      );
+    }
 
     return (
       <Notice

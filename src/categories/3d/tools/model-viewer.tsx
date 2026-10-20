@@ -316,25 +316,41 @@ export default function ModelViewer() {
       }
       info={stats ? `${formatNumber(stats.triangles)} triangles` : undefined}
     >
-      {!file ? (
-        <DropZone
-          onFiles={(files) => files[0] && void load(files[0])}
-          accept={MODEL_ACCEPT}
-          formats={['GLB', 'GLTF', 'FBX', 'OBJ', 'STL', 'PLY', 'DAE']}
-          size="lg"
-          multiple={false}
-          icon={<Eye />}
-          title="Drop a 3D model"
-        />
-      ) : (
-        <Panel title={file.name}>
+      <Panel title={file ? file.name : 'Viewport'}>
+        <div style={{ position: 'relative' }}>
           <div
             ref={containerRef}
             className="stage"
             style={{ minHeight: 480, padding: 0, overflow: 'hidden', cursor: 'grab' }}
           />
-        </Panel>
-      )}
+          {!file && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 20,
+                background: 'var(--bg-0)',
+                borderRadius: 'var(--r-md)',
+              }}
+            >
+              <div style={{ width: '100%', maxWidth: 720 }}>
+                <DropZone
+                  onFiles={(files) => files[0] && void load(files[0])}
+                  accept={MODEL_ACCEPT}
+                  formats={['GLB', 'GLTF', 'FBX', 'OBJ', 'STL', 'PLY', 'DAE']}
+                  size="md"
+                  multiple={false}
+                  icon={<Eye />}
+                  title="Drop a 3D model"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </Panel>
 
       {task.running && (
         <Panel title="Loading">

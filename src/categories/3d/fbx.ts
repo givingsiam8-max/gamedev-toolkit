@@ -1,5 +1,5 @@
 /**
- * Real FBX asset extraction for the FBX Asset Extractor tool.
+ * Real FBX asset extraction for the 3D Asset Extractor tool.
  *
  * - Meshes come from three's FBXLoader (actual geometry), exported per object.
  * - Embedded textures are read from the binary FBX "Video" nodes, preserving the

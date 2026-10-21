@@ -6,18 +6,19 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+import { TDSLoader } from 'three/examples/jsm/loaders/TDSLoader.js';
 import { UserError } from '../../core/errors';
 
-export type ModelFormat = 'glb' | 'gltf' | 'fbx' | 'obj' | 'stl' | 'ply' | 'dae';
+export type ModelFormat = 'glb' | 'gltf' | 'fbx' | 'obj' | 'stl' | 'ply' | 'dae' | '3ds';
 
-const FORMATS: readonly ModelFormat[] = ['glb', 'gltf', 'fbx', 'obj', 'stl', 'ply', 'dae'];
+const FORMATS: readonly ModelFormat[] = ['glb', 'gltf', 'fbx', 'obj', 'stl', 'ply', 'dae', '3ds'];
 
 export function detectFormat(fileName: string): ModelFormat | null {
   const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
   return (FORMATS as readonly string[]).includes(ext) ? (ext as ModelFormat) : null;
 }
 
-export const MODEL_ACCEPT = '.glb,.gltf,.fbx,.obj,.stl,.ply,.dae';
+export const MODEL_ACCEPT = '.glb,.gltf,.fbx,.obj,.stl,.ply,.dae,.3ds';
 
 export interface LoadedModel {
   root: THREE.Object3D;
@@ -70,7 +71,7 @@ export async function loadModelFile(file: File): Promise<LoadedModel> {
   if (!format) {
     throw new UserError(
       `"${file.name}" is not a supported 3D format.`,
-      'Supported: GLB, GLTF, FBX, OBJ, STL, PLY, DAE.',
+      'Supported: GLB, GLTF, FBX, OBJ, STL, PLY, DAE, 3DS.',
     );
   }
 
@@ -105,6 +106,21 @@ export async function loadModelFile(file: File): Promise<LoadedModel> {
     if (format === 'ply') {
       const root = wrapGeometry(new PLYLoader().parse(await file.arrayBuffer()));
       return { root, format, animations: [], dispose: () => disposeObject(root) };
+    }
+    if (format === '3ds') {
+      const manager = new THREE.LoadingManager();
+      manager.setURLModifier((url) =>
+        /^(data:|blob:)/.test(url)
+          ? url
+          : 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=',
+      );
+      const group = new TDSLoader(manager).parse(await file.arrayBuffer(), '');
+      return {
+        root: group,
+        format,
+        animations: [],
+        dispose: () => disposeObject(group),
+      };
     }
 
     const collada = new ColladaLoader().parse(await file.text(), '');

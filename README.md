@@ -28,7 +28,7 @@ Node 20+ is required.
 
 | Category | Tools |
 | --- | --- |
-| 3D Tools | Model viewer, model converter, FBX asset extractor, texture extractor, mesh statistics |
+| 3D Tools | Model viewer, model converter, 3D asset extractor (FBX, GLB, GLTF, OBJ, STL, PLY, DAE, 3DS), texture extractor, mesh statistics |
 | Image Tools | Format converter, resizer, compressor, cropper, batch processor, inspector |
 | Photo Editing | Full editor (crop/resize/adjust/colour/effects, undo, compare), background remover, background replacer, filters |
 | Texture Tools | Resizer, converter, compressor, channel viewer/packer, PBR map preview, seamless maker, tiling preview, atlas builder |
@@ -62,15 +62,16 @@ MP3/WAV export. **Multi-layer** mode turns the same file into a timeline track a
   (gain, fades, normalization, compression, EQ, speed, pitch, channels, sample rate, bit depth);
 - a 24-bit WAV export option alongside 16-bit WAV and MP3.
 
-### FBX component split
+### 3D asset extraction and component split
 
-The FBX Asset Extractor has two modes. **Extract assets** pulls meshes and embedded textures out of
-the file. **Split components** lets you select individual mesh objects and exports each one as a
-standalone package — OBJ + MTL + `textures/`, or GLB with embedded PBR materials — even when the
-source FBX shared one material across several objects. Material definitions are duplicated per
-component (so editing one never affects another), per-face material slots, UVs and normals are
-preserved, and shared texture pixels are copied unchanged. Skinning, morph targets and animation
-are not part of component packages.
+The 3D Asset Extractor accepts **FBX, GLB, GLTF, OBJ, STL, PLY, DAE and 3DS**. **Extract assets**
+pulls meshes and embedded textures out of each file. **Split components** lets you select individual
+mesh objects and exports each one as a standalone package — OBJ + MTL + `textures/`, or GLB with
+embedded PBR materials — even when several objects shared one material. Material definitions are
+duplicated per component, per-face material slots, UVs and normals are preserved, and shared texture
+pixels are copied unchanged. Skinning, morph targets and animation are not part of component
+packages. OBJ, STL and PLY are geometry-only; external MTL, DAE/3DS images, glTF image URIs and
+external `.bin` buffers are reported but not fetched.
 
 ## Architecture
 
@@ -129,7 +130,8 @@ repository's Pages configuration.
   Chromium/Firefox; audio decoding depends on the platform's codecs.
 - 3D: FBX can be exported as ASCII 7.4 for static meshes with basic Phong materials — skinning,
   morph targets, animations and textures are not embedded. Collada is import-only. DRACO/KTX2
-  compressed glTF is not supported.
+  compressed glTF is not supported. The asset extractor cannot fetch external `.bin`, `.mtl` or
+  texture files referenced by a model.
 - Background removal is colour keying, not AI segmentation; it needs a flat background.
 - Texture "VRAM" and draw-call numbers are estimates from geometry, not profiler measurements.
 - Browser tools cannot encode GPU texture formats (BC7/ASTC/ETC2); those need an engine importer.

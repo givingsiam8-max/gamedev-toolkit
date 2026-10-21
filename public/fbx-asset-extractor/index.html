@@ -3,18 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FBX Asset Extractor — Extract Meshes and Textures Online</title>
+    <title>3D Asset Extractor — Meshes and Textures from FBX, GLB, OBJ</title>
     <meta
       name="description"
-      content="Extract mesh objects and texture assets from FBX files, or split components with independent materials and texture references. Runs locally in your browser; files are never uploaded."
+      content="Extract mesh objects and embedded textures from FBX, GLB, GLTF, OBJ, STL, PLY, DAE and 3DS files, or split components with independent materials and texture references. Runs locally in your browser; files are never uploaded."
     />
     <meta name="robots" content="index, follow, max-image-preview:large" />
     <link rel="canonical" href="https://givingsiam8-max.github.io/gamedev-toolkit/fbx-asset-extractor/" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="FBX Asset Extractor — Extract Meshes and Textures Online" />
+    <meta property="og:title" content="3D Asset Extractor — Meshes and Textures from FBX, GLB, OBJ" />
     <meta
       property="og:description"
-      content="Pull mesh objects and embedded textures out of FBX files. Download each asset or the whole batch as a ZIP."
+      content="Pull meshes and embedded textures out of FBX, GLB, GLTF, OBJ, STL, PLY, DAE and 3DS models. Download each asset or the whole batch as a ZIP."
     />
     <meta property="og:url" content="https://givingsiam8-max.github.io/gamedev-toolkit/fbx-asset-extractor/" />
     <meta property="og:image" content="https://givingsiam8-max.github.io/gamedev-toolkit/og-image.jpg" />
@@ -44,11 +44,11 @@
 
     <main id="main" class="container">
       <span class="badge">3D Tools</span>
-      <h1>FBX Asset Extractor</h1>
+      <h1>3D Asset Extractor</h1>
       <p class="lead">
-        Extract mesh objects and texture assets from FBX 3D model files. Inspect what is inside a
+        Extract mesh objects and texture assets from FBX, GLB, GLTF, OBJ, STL, PLY, DAE and 3DS models. Inspect what is inside a
         model, download each asset on its own, or grab the whole batch as a ZIP. Everything runs in
-        your browser — the FBX is never uploaded.
+        your browser — the file is never uploaded.
       </p>
 
       <div class="actions">
@@ -61,14 +61,14 @@
         <div class="card">
           <h3>Mesh objects</h3>
           <p>
-            Each mesh in the FBX becomes its own file. Choose OBJ, GLB, STL or PLY; world transforms
+            Each mesh in the model becomes its own file. Choose OBJ, GLB, STL or PLY; world transforms
             are baked into the exported geometry.
           </p>
         </div>
         <div class="card">
           <h3>Embedded textures</h3>
           <p>
-            Images stored inside the FBX container are written out in their original format (PNG,
+            Images embedded inside FBX, GLB/GLTF and DAE files are written out in their original format where possible (PNG,
             JPG, BMP, GIF, WebP, TGA and more) with previews where the browser can display them.
           </p>
         </div>
@@ -82,7 +82,7 @@
         <div class="card">
           <h3>Batch processing</h3>
           <p>
-            Drop several FBX files at once. Each is processed independently, so one broken file does
+            Drop several 3D files at once. Each is processed independently, so one broken file does
             not stop the rest.
           </p>
         </div>
@@ -91,7 +91,7 @@
       <h2>Split components with independent materials</h2>
       <p>
         Switch the tool to <strong>Split components</strong> to choose individual mesh objects from
-        the FBX hierarchy. Each selected component is exported separately — not merged — with its own
+        the model hierarchy. Each selected component is exported separately — not merged — with its own
         material definitions, even when several components shared one material in the source file.
       </p>
       <ul>
@@ -99,7 +99,7 @@
         <li>Shared materials are duplicated per component, so editing one never changes another.</li>
         <li>Texture references are kept; shared textures are copied unchanged into each package.</li>
         <li>OBJ output ships an MTL file plus a <code>textures/</code> folder; GLB embeds materials and textures.</li>
-        <li>With several source FBX files, each file gets its own folder in the ZIP.</li>
+        <li>With several source files, each file gets its own folder in the ZIP.</li>
       </ul>
 
       <pre
@@ -131,12 +131,13 @@
 
       <h2>How it works</h2>
       <p>
-        Geometry is read with the three.js FBX loader. Embedded textures are decoded from the FBX
-        container itself, so the original image bytes are preserved. Progress is reported per stage —
-        analyzing, extracting meshes, extracting textures — and each file shows its own status.
+        Geometry is read with the matching three.js loader for each format. Embedded images keep
+        their original bytes when the container exposes them (FBX, GLB and embedded glTF); images
+        decoded by the loader are re-encoded as PNG. Progress is reported per stage — analyzing,
+        extracting meshes, extracting textures — and each file shows its own status.
       </p>
       <p>
-        For multiple files, the ZIP is organised into one folder per source FBX, with
+        For multiple files, the ZIP is organised into one folder per source model, with
         <code>meshes/</code>, <code>textures/</code> and a <code>report.json</code> describing what was
         extracted.
       </p>
@@ -144,12 +145,14 @@
       <h2>Good to know</h2>
       <ul>
         <li>Limit: 200 MB per file, up to 30 files per batch.</li>
-        <li>Only the mesh objects and texture media stored in the file can be extracted.</li>
+        <li>Supported inputs: FBX, GLB, GLTF, OBJ, STL, PLY, DAE and 3DS.</li>
+        <li>Only meshes and texture media stored inside the file can be extracted.</li>
         <li>External texture paths cannot be read in the browser; they are listed for reference.</li>
+        <li>OBJ, STL and PLY are geometry-only. A single .gltf cannot read external .bin buffers; use a self-contained .glb or embedded glTF. DAE and 3DS usually reference external images.</li>
         <li>ASCII FBX files usually reference textures externally rather than embedding them.</li>
         <li>
-          Meshes can be exported as OBJ, GLB, STL, PLY or ASCII FBX. FBX output is static geometry
-          with basic materials — no skinning or animation.
+          Meshes can be exported as OBJ, GLB, STL or PLY. Component packages export as OBJ + MTL or
+          GLB; all output is static geometry without skinning or animation.
         </li>
         <li>Very large models may take a few seconds to parse; the interface shows progress and stays on the tool.</li>
       </ul>
@@ -162,7 +165,7 @@
       </p>
 
       <div class="actions">
-        <a class="btn" href="../#/t/fbx-asset-extractor">Extract an FBX now</a>
+        <a class="btn" href="../#/t/fbx-asset-extractor">Extract 3D assets now</a>
       </div>
     </main>
 

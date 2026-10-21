@@ -340,7 +340,7 @@ export default function ModelViewer() {
                 <DropZone
                   onFiles={(files) => files[0] && void load(files[0])}
                   accept={MODEL_ACCEPT}
-                  formats={['GLB', 'GLTF', 'FBX', 'OBJ', 'STL', 'PLY', 'DAE']}
+                  formats={['GLB', 'GLTF', 'FBX', 'OBJ', 'STL', 'PLY', 'DAE', '3DS']}
                   size="md"
                   multiple={false}
                   icon={<Eye />}

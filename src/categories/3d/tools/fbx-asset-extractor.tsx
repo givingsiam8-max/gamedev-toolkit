@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Group } from 'three';
+import type { Object3D } from 'three';
 import { Download, FileText, Package, RefreshCw, ScanSearch } from 'lucide-react';
 import { ToolShell } from '../../../components/ToolShell';
 import {
@@ -33,6 +33,14 @@ import {
   type ExtractedAsset,
   type MeshFormat,
 } from '../fbx';
+import {
+  ASSET_MODEL_ACCEPT,
+  ASSET_MODEL_LABELS,
+  detectAssetFormat,
+  loadGenericModel,
+  TEXTURE_CAPABLE,
+  type AssetModelFormat,
+} from '../model-assets';
 import { disposeObject } from '../model';
 import {
   analyzeComponents,
@@ -61,6 +69,7 @@ interface Asset extends ExtractedAsset {
 interface FileResult {
   id: string;
   fileName: string;
+  format: AssetModelFormat | 'unknown';
   folder: string;
   meshes: Asset[];
   textures: Asset[];
@@ -141,7 +150,7 @@ function uniqueAssetName(name: string, used: Set<string>): string {
 
 export default function FbxAssetExtractor() {
   const toast = useToast();
-  const queue = useFileQueue({ accept: '.fbx', maxFiles: 30 });
+  const queue = useFileQueue({ accept: ASSET_MODEL_ACCEPT, maxFiles: 30 });
   const [extractMeshesOn, setExtractMeshesOn] = useState(true);
   const [extractTexturesOn, setExtractTexturesOn] = useState(true);
   const [meshFormat, setMeshFormat] = useState<MeshFormat>('obj');
@@ -158,7 +167,7 @@ export default function FbxAssetExtractor() {
   const [splitBusy, setSplitBusy] = useState(false);
   const scanTask = useTask<ScannedFile[]>();
   const splitTask = useTask<SplitOutput[]>();
-  const rootsRef = useRef<Map<string, { root: Group; externalRefs: string[] }>>(new Map());
+  const rootsRef = useRef<Map<string, { root: Object3D; externalRefs: string[] }>>(new Map());
 
   useEffect(
     () => () => {
@@ -170,7 +179,7 @@ export default function FbxAssetExtractor() {
 
   useEffect(() => {
     const previous = document.title;
-    document.title = 'FBX Asset Extractor — Extract Meshes and Textures Online';
+    document.title = '3D Asset Extractor — Meshes and Textures from FBX, GLB, OBJ';
     return () => {
       document.title = previous;
     };
@@ -203,7 +212,7 @@ export default function FbxAssetExtractor() {
 
   const scanComponents = () =>
     scanTask.run(async (report) => {
-      if (!queue.items.length) throw new UserError('Add at least one FBX file.');
+      if (!queue.items.length) throw new UserError('Add at least one 3D model file.');
       for (const entry of rootsRef.current.values()) disposeObject(entry.root);
       rootsRef.current.clear();
       setSplitResults([]);
@@ -215,32 +224,48 @@ export default function FbxAssetExtractor() {
       for (let index = 0; index < items.length; index += 1) {
         const item = items[index];
         const label = item.file.name;
-        const folder = safeFileName(stripExt(label), 'fbx');
+        const folder = safeFileName(stripExt(label), 'model');
         report(index / items.length, `Reading components from ${label}`);
         queue.setStatus(item.id, 'processing', 'Scanning');
 
         try {
-          if (!/\.fbx$/i.test(label)) throw new UserError('Only .fbx files are supported.');
+          const format = detectAssetFormat(label);
+          if (!format) {
+            throw new UserError(
+              'Unsupported 3D format. Use FBX, GLB, GLTF, OBJ, STL, PLY, DAE or 3DS.',
+            );
+          }
           if (item.file.size === 0) throw new UserError('The file is empty.');
           if (item.file.size > MAX_SIZE) {
             throw new UserError(`File is too large. Limit is ${formatBytes(MAX_SIZE)}.`);
           }
-          const buffer = await item.file.arrayBuffer();
-          if (!isLikelyFbx(buffer)) {
-            throw new UserError('This does not look like an FBX file (unrecognized header).');
+
+          let root: Object3D;
+          let refs: string[] = [];
+
+          if (format === 'fbx') {
+            const buffer = await item.file.arrayBuffer();
+            if (!isLikelyFbx(buffer)) {
+              throw new UserError('This does not look like an FBX file (unrecognized header).');
+            }
+            const media = scanFbxMedia(buffer);
+            const { loader, externalRefs } = createFbxLoader();
+            root = loader.parse(buffer.slice(0), '');
+            await waitForComponentTextures(root);
+            refs = [...new Set([...externalRefs, ...media.references])];
+          } else {
+            const loaded = await loadGenericModel(item.file);
+            root = loaded.root;
+            await waitForComponentTextures(root);
+            refs = loaded.externalRefs;
           }
 
-          const media = scanFbxMedia(buffer);
-          const { loader, externalRefs } = createFbxLoader();
-          const root = loader.parse(buffer.slice(0), '');
-          await waitForComponentTextures(root);
           const components = analyzeComponents(root);
           if (!components.length) {
             disposeObject(root);
-            throw new UserError('No mesh objects were found in this FBX.');
+            throw new UserError(`No mesh objects were found in this ${format.toUpperCase()}.`);
           }
 
-          const refs = [...new Set([...externalRefs, ...media.references])];
           rootsRef.current.set(item.id, { root, externalRefs: refs });
           output.push({ id: item.id, fileName: label, folder, components, externalRefs: refs });
           for (const component of components) ids.push(component.id);
@@ -375,7 +400,7 @@ export default function FbxAssetExtractor() {
       const multi = splitResults.length > 1;
       const folderCounts = new Map<string, number>();
       const folderFor = (folder: string): string => {
-        const base = safeFileName(folder, 'fbx') || 'fbx';
+        const base = safeFileName(folder, 'model') || 'model';
         const count = (folderCounts.get(base) ?? 0) + 1;
         folderCounts.set(base, count);
         return count === 1 ? base : `${base}-${count}`;
@@ -393,7 +418,7 @@ export default function FbxAssetExtractor() {
       const archive = await buildZip(entries);
       downloadBlob(
         archive,
-        multi ? 'fbx-components.zip' : `${splitResults[0].folder}-components.zip`,
+        multi ? '3d-components.zip' : `${splitResults[0].folder}-components.zip`,
       );
       toast.success(`ZIP created (${formatBytes(archive.size)}).`);
     } catch (error) {
@@ -428,7 +453,7 @@ export default function FbxAssetExtractor() {
       clearSplit();
     }
     if (added.rejected.length) {
-      toast.warning(`${added.rejected.length} file(s) are not .fbx and were skipped.`);
+      toast.warning(`${added.rejected.length} file(s) are not a supported 3D format and were skipped.`);
     }
   };
 
@@ -440,7 +465,7 @@ export default function FbxAssetExtractor() {
 
   const run = () =>
     task.run(async (report) => {
-      if (!queue.items.length) throw new UserError('Add at least one FBX file.');
+      if (!queue.items.length) throw new UserError('Add at least one 3D model file.');
       if (!extractMeshesOn && !extractTexturesOn) {
         throw new UserError('Select meshes, textures, or both.');
       }
@@ -466,48 +491,73 @@ export default function FbxAssetExtractor() {
         let externalRefs: string[] = [];
 
         try {
-          if (!/\.fbx$/i.test(label)) throw new UserError('Only .fbx files are supported.');
+          const format = detectAssetFormat(label);
+          if (!format) {
+            throw new UserError(
+              'Unsupported 3D format. Use FBX, GLB, GLTF, OBJ, STL, PLY, DAE or 3DS.',
+            );
+          }
           if (item.file.size === 0) throw new UserError('The file is empty.');
           if (item.file.size > MAX_SIZE) {
             throw new UserError(`File is too large. Limit is ${formatBytes(MAX_SIZE)}.`);
           }
 
-          const buffer = await item.file.arrayBuffer();
-          if (!isLikelyFbx(buffer)) {
-            throw new UserError('This does not look like an FBX file (unrecognized header).');
-          }
+          let root: Object3D | null = null;
+          let embeddedImages: ExtractedAsset[] = [];
+          const isFbx = format === 'fbx';
 
-          report(base + 0.08 / total, `Scanning embedded media in ${label}`);
-          const scan = scanFbxMedia(buffer);
-          scanSummary[item.id] = {
-            imageCount: scan.images.length,
-            referenceCount: scan.references.length,
-            ascii: scan.ascii,
-          };
-          externalRefs.push(...scan.references);
-          if (scan.ascii) {
-            warnings.push(
-              'ASCII FBX detected. Embedded textures are uncommon in this variant; external texture files must ship alongside the model.',
-            );
-          }
-          if (scan.error) warnings.push(`Container scan: ${scan.error}`);
+          if (isFbx) {
+            const buffer = await item.file.arrayBuffer();
+            if (!isLikelyFbx(buffer)) {
+              throw new UserError('This does not look like an FBX file (unrecognized header).');
+            }
 
-          let root: Group | null = null;
-          const { loader, externalRefs: loaderRefs } = createFbxLoader();
-          report(base + 0.16 / total, `Reading geometry from ${label}`);
-          await new Promise((resolve) => setTimeout(resolve, 0));
+            report(base + 0.08 / total, `Scanning embedded media in ${label}`);
+            const scan = scanFbxMedia(buffer);
+            scanSummary[item.id] = {
+              imageCount: scan.images.length,
+              referenceCount: scan.references.length,
+              ascii: scan.ascii,
+            };
+            externalRefs.push(...scan.references);
+            if (scan.ascii) {
+              warnings.push(
+                'ASCII FBX detected. Embedded textures are uncommon in this variant; external texture files must ship alongside the model.',
+              );
+            }
+            if (scan.error) warnings.push(`Container scan: ${scan.error}`);
+            embeddedImages = scan.images.map((image) => ({
+              name: safeFileName(image.name, 'texture'),
+              blob: new Blob([image.bytes as BlobPart], { type: image.mime }),
+            }));
 
-          try {
-            root = loader.parse(buffer.slice(0), '');
-          } catch (error) {
-            failures.push(
-              `Geometry parsing failed: ${error instanceof Error ? error.message : 'invalid FBX data'}`,
-            );
+            const { loader, externalRefs: loaderRefs } = createFbxLoader();
+            report(base + 0.16 / total, `Reading geometry from ${label}`);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            try {
+              root = loader.parse(buffer.slice(0), '');
+              externalRefs.push(...loaderRefs);
+            } catch (error) {
+              failures.push(
+                `Geometry parsing failed: ${error instanceof Error ? error.message : 'invalid FBX data'}`,
+              );
+            }
+          } else {
+            report(base + 0.08 / total, `Reading geometry and media from ${label}`);
+            const loaded = await loadGenericModel(item.file);
+            root = loaded.root;
+            externalRefs.push(...loaded.externalRefs);
+            warnings.push(...loaded.warnings);
+            embeddedImages = loaded.embeddedImages;
+            scanSummary[item.id] = {
+              imageCount: embeddedImages.length,
+              referenceCount: loaded.externalRefs.length,
+              ascii: false,
+            };
           }
 
           if (root) {
             materials = collectMaterials(root);
-            externalRefs.push(...loaderRefs);
 
             if (extractMeshesOn) {
               report(base + 0.22 / total, `Extracting meshes from ${label}`);
@@ -521,17 +571,16 @@ export default function FbxAssetExtractor() {
 
             if (extractTexturesOn) {
               report(base + 0.75 / total, `Extracting textures from ${label}`);
-              if (scan.images.length) {
-                for (const image of scan.images) {
-                  const blob = new Blob([image.bytes as BlobPart], { type: image.mime });
+              if (embeddedImages.length) {
+                for (const image of embeddedImages) {
                   const name = safeFileName(image.name, 'texture');
                   textures.push({
                     name,
-                    blob,
-                    previewUrl: makePreview(blob, extensionOf(name)),
+                    blob: image.blob,
+                    previewUrl: makePreview(image.blob, extensionOf(name)),
                   });
                 }
-              } else {
+              } else if (TEXTURE_CAPABLE.has(format)) {
                 const fallback = await extractLoadedMaterialTextures(root);
                 for (const asset of fallback.assets) {
                   textures.push({
@@ -540,9 +589,11 @@ export default function FbxAssetExtractor() {
                   });
                 }
                 failures.push(...fallback.failures);
-                if (!fallback.assets.length && !scan.images.length && !scan.ascii) {
+                if (!fallback.assets.length) {
                   warnings.push(
-                    'No embedded textures were found. This FBX may reference textures as external files.',
+                    isFbx
+                      ? 'No embedded textures were found. This FBX may reference textures as external files.'
+                      : `No embedded textures were found in this ${format.toUpperCase()}. It may reference external texture files.`,
                   );
                 }
               }
@@ -550,12 +601,15 @@ export default function FbxAssetExtractor() {
 
             revokeLoadedTextureUrls(root);
             disposeObject(root);
-          } else if (extractTexturesOn && scan.images.length) {
+          } else if (extractTexturesOn && embeddedImages.length) {
             // A corrupt scene can still contain usable embedded images.
-            for (const image of scan.images) {
-              const blob = new Blob([image.bytes as BlobPart], { type: image.mime });
+            for (const image of embeddedImages) {
               const name = safeFileName(image.name, 'texture');
-              textures.push({ name, blob, previewUrl: makePreview(blob, extensionOf(name)) });
+              textures.push({
+                name,
+                blob: image.blob,
+                previewUrl: makePreview(image.blob, extensionOf(name)),
+              });
             }
           }
 
@@ -570,7 +624,8 @@ export default function FbxAssetExtractor() {
           const result: FileResult = {
             id: item.id,
             fileName: label,
-            folder: safeFileName(stripExt(label), 'fbx'),
+            format,
+            folder: safeFileName(stripExt(label), 'model'),
             meshes,
             textures: uniqueTextures,
             materials,
@@ -597,7 +652,8 @@ export default function FbxAssetExtractor() {
           output.push({
             id: item.id,
             fileName: label,
-            folder: safeFileName(stripExt(label), 'fbx'),
+            format: detectAssetFormat(label) ?? 'unknown',
+            folder: safeFileName(stripExt(label), 'model'),
             meshes: [],
             textures: [],
             materials: [],
@@ -632,7 +688,7 @@ export default function FbxAssetExtractor() {
       const multi = results.length > 1;
       const folderCounts = new Map<string, number>();
       const folderFor = (folder: string): string => {
-        const base = safeFileName(folder, 'fbx') || 'fbx';
+        const base = safeFileName(folder, 'model') || 'model';
         const count = (folderCounts.get(base) ?? 0) + 1;
         folderCounts.set(base, count);
         return count === 1 ? base : `${base}-${count}`;
@@ -654,13 +710,14 @@ export default function FbxAssetExtractor() {
               JSON.stringify(
                 {
                   source: file.fileName,
+                  format: file.format,
                   meshes: file.meshes.map((mesh) => ({ name: mesh.name, bytes: mesh.blob.size })),
                   textures: file.textures.map((texture) => ({
                     name: texture.name,
                     bytes: texture.blob.size,
                   })),
                   materials: file.materials,
-                  externalTextureReferences: file.externalRefs,
+                  externalReferences: file.externalRefs,
                   warnings: file.warnings,
                   failures: file.failures,
                 },
@@ -673,7 +730,7 @@ export default function FbxAssetExtractor() {
         });
       }
       const archive = await buildZip(entries);
-      downloadBlob(archive, multi ? 'fbx-assets.zip' : `${results[0].folder}-assets.zip`);
+      downloadBlob(archive, multi ? '3d-assets.zip' : `${results[0].folder}-assets.zip`);
       toast.success(`ZIP created (${formatBytes(archive.size)}).`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not create the ZIP.');
@@ -743,12 +800,18 @@ export default function FbxAssetExtractor() {
                 />
               </Field>
               <Notice tone="info" title="How it works">
-                Geometry is read with three.js FBXLoader. Embedded textures are decoded from the FBX
-                container itself. External texture paths are listed but never fetched.
+                Geometry is read with the matching three.js loader for FBX, GLB/GLTF, DAE, OBJ, STL,
+                PLY and 3DS. Embedded textures are decoded from the file itself; external texture
+                paths are listed but never fetched.
               </Notice>
-              <Notice tone="warning" title="Limits">
+              <Notice tone="warning" title="Format limits">
+                OBJ, STL and PLY are geometry-only. A single .gltf cannot read external .bin buffers;
+                use a self-contained .glb or embedded glTF. External MTL, texture files and glTF
+                images are not fetched.
+              </Notice>
+              <Notice tone="info" title="Limits">
                 Maximum {formatBytes(MAX_SIZE)} per file, up to 30 files per batch. Very large or
-                unusual FBX files may take a moment to parse.
+                unusual models may take a moment to parse.
               </Notice>
             </>
           ) : (
@@ -861,31 +924,31 @@ export default function FbxAssetExtractor() {
                     scanned.reduce((sum, file) => sum + file.components.length, 0),
                   )} components found`
                 : queue.items.length
-                  ? `${formatNumber(queue.items.length)} FBX file(s) ready`
+                  ? `${formatNumber(queue.items.length)} 3D file(s) ready`
                   : undefined
           : task.running
             ? task.message
             : results.length
               ? `${formatNumber(totalMeshes)} meshes · ${formatNumber(totalTextures)} textures`
               : queue.items.length
-                ? `${formatNumber(queue.items.length)} FBX file(s) ready`
+                ? `${formatNumber(queue.items.length)} 3D file(s) ready`
                 : undefined
       }
     >
       {queue.items.length === 0 ? (
         <DropZone
           onFiles={addFiles}
-          accept=".fbx"
+          accept={ASSET_MODEL_ACCEPT}
           multiple
-          formats={['FBX']}
+          formats={ASSET_MODEL_LABELS}
           size="lg"
-          title="Drop FBX files or choose them"
-          hint="Drag & drop works too. Add several files to extract them in one batch."
+          title="Drop 3D models or choose them"
+          hint="FBX, GLB, GLTF, OBJ, STL, PLY, DAE and 3DS. Add several files to extract them in one batch."
           icon={<Package />}
         />
       ) : (
         <Panel
-          title="FBX files"
+          title="3D model files"
           actions={
             <QueueHeader
               count={queue.items.length}
@@ -1067,9 +1130,9 @@ export default function FbxAssetExtractor() {
               )}
 
               {file.externalRefs.length > 0 && (
-                <Notice tone="info" title="External texture references">
-                  These paths are referenced by the FBX but not embedded, so they cannot be extracted
-                  from the file:
+                <Notice tone="info" title="External references">
+                  These paths are referenced by the model but not embedded, so they cannot be
+                  extracted from the file:
                   <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
                     {file.externalRefs.slice(0, 20).map((ref) => (
                       <li key={ref} className="mono tiny">
@@ -1129,7 +1192,7 @@ export default function FbxAssetExtractor() {
 
           {!scanned.length && !scanTask.running && queue.items.length > 0 && (
             <Notice tone="info" title="Scan first">
-              Press <strong>Scan Components</strong> to list the mesh objects inside your FBX files,
+              Press <strong>Scan Components</strong> to list the mesh objects inside your 3D files,
               then choose which ones to export. Each component receives independent materials and its
               own texture files.
             </Notice>
@@ -1206,7 +1269,7 @@ export default function FbxAssetExtractor() {
                   ))}
                   {file.externalRefs.length > 0 && (
                     <div className="dim tiny">
-                      {formatNumber(file.externalRefs.length)} external texture reference(s) will be
+                      {formatNumber(file.externalRefs.length)} external resource reference(s) will be
                       listed in each component report.
                     </div>
                   )}

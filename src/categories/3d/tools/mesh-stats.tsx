@@ -168,7 +168,7 @@ export default function MeshStatistics() {
         <DropZone
           onFiles={(files) => void onFiles(files)}
           accept={MODEL_ACCEPT}
-          formats={['GLB', 'GLTF', 'FBX', 'OBJ', 'STL', 'PLY', 'DAE']}
+          formats={['GLB', 'GLTF', 'FBX', 'OBJ', 'STL', 'PLY', 'DAE', '3DS']}
           size="lg"
           multiple={false}
           icon={<Hash />}
